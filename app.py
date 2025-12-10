@@ -1,179 +1,332 @@
-"""
-💰 Bitcoin Intraday Predictor (AI-Powered)
-Dashboard Prediksi Bitcoin Real-Time menggunakan LSTM Model
-
-Author: Bitcoin Price Prediction System
-Date: December 2025
-"""
-
 import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import pandas_ta as ta
-import plotly.graph_objects as go
-from datetime import datetime, timedelta
 import tensorflow as tf
-from tensorflow import keras
+from datetime import datetime, timedelta
 import joblib
+import base64
+import streamlit.components.v1 as components
+import plotly.graph_objects as go
+import logging
+
+# Import configuration
+import config
+
+# ==================== LOGGING SETUP ====================
+logging.basicConfig(
+    level=getattr(logging, config.LOG_LEVEL),
+    format=config.LOG_FORMAT,
+    datefmt=config.LOG_DATE_FORMAT
+)
+logger = logging.getLogger(__name__)
+logger.info("🚀 Bitcoin LSTM Dashboard started")
 
 # ==================== KONFIGURASI PAGE ====================
 st.set_page_config(
-    page_title="Bitcoin AI Predictor",
-    page_icon="💰",
+    page_title=config.APP_TITLE,
+    page_icon="bitcoin-btc-logo.png",  # Custom Bitcoin logo
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
+
+# ... (CSS Injection remains checks out, skip to Feature Engineering)
+
+# ==================== MANUAL INDICATOR FUNCTIONS (NO DEPENDENCIES) ====================
+def calculate_rsi(series, period=14):
+    """Calculate RSI manually using Pandas"""
+    delta = series.diff()
+    gain = (delta.where(delta > 0, 0)).fillna(0)
+    loss = (-delta.where(delta < 0, 0)).fillna(0)
+    
+    avg_gain = gain.rolling(window=period, min_periods=1).mean()
+    avg_loss = loss.rolling(window=period, min_periods=1).mean()
+    
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+def calculate_macd(series, fast=12, slow=26, signal=9):
+    """Calculate MACD manually using Pandas"""
+    exp1 = series.ewm(span=fast, adjust=False).mean()
+    exp2 = series.ewm(span=slow, adjust=False).mean()
+    macd_line = exp1 - exp2
+    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+    histogram = macd_line - signal_line
+    return macd_line, signal_line, histogram
+
+# ==================== CUSTOM CSS (CYBERPUNK STYLE) ====================
+def inject_custom_css():
+    st.markdown("""
+        <style>
+        /* Import Google Fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+        /* Base Typography */
+        html, body, [class*="css"] {
+            font-family: 'Exo 2', sans-serif !important;
+            color: #E0E0E0;
+        }
+
+        /* Titles and Headers */
+        h1, h2, h3 {
+            font-weight: 700;
+            background: linear-gradient(90deg, #00D9FF, #BD00FF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
+        }
+        
+        .metric-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: #888;
+            text-transform: uppercase;
+        }
+        
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #FFF;
+        }
+
+        /* Cards/Containers */
+        div[data-testid="stMetric"], div[data-testid="stExpander"] {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        div[data-testid="stMetric"]:hover {
+            border-color: #00D9FF;
+            box-shadow: 0 0 15px rgba(0, 217, 255, 0.2);
+        }
+
+        /* Buttons */
+        div.stButton > button {
+            background: linear-gradient(90deg, #00C6FF 0%, #0072FF 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        div.stButton > button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 114, 255, 0.4);
+        }
+
+        div.stButton > button:active {
+            transform: translateY(0);
+        }
+
+        /* Sidebar */
+        section[data-testid="stSidebar"] {
+            background-color: #080A10;
+            border-right: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Plotly Chart Background */
+        .js-plotly-plot .plotly .main-svg {
+            background: transparent !important;
+        }
+        
+        </style>
+    """, unsafe_allow_html=True)
+
+inject_custom_css()
 
 # ==================== LOAD MODEL & SCALER ====================
 @st.cache_resource
 def load_model_and_scaler():
-    """
-    Load model LSTM dan scaler yang sudah dilatih.
-    Menggunakan cache agar tidak reload setiap kali.
-    """
+    """Load pretrained LSTM model and scaler"""
     try:
-        model = keras.models.load_model('model_bitcoin_final.keras')
+        # Use tf.keras instead of direct keras import to avoid DLL issues
+        model = tf.keras.models.load_model('model_bitcoin_final.keras')
         scaler = joblib.load('scaler_bitcoin.pkl')
         return model, scaler
     except Exception as e:
         st.error(f"❌ Error loading model/scaler: {str(e)}")
         st.stop()
 
-# Load assets
 model, scaler = load_model_and_scaler()
 
 # ==================== FUNGSI AMBIL DATA LIVE ====================
-@st.cache_data(ttl=60)  # Cache selama 60 detik untuk performa
+@st.cache_data(ttl=config.CACHE_TTL_DATA, show_spinner=False)
 def get_live_bitcoin_data():
+    """Fetch live data from Yahoo Finance with Retry Logic"""
+    import time
+    logger.info(f"Fetching Bitcoin data: {config.TICKER_SYMBOL}, Period: {config.DATA_PERIOD}, Interval: {config.DATA_INTERVAL}")
+    
+    for i in range(config.MAX_RETRIES):
+        try:
+            # Try fetching with yf.download wrapper which proved more stable
+            df = yf.download(config.TICKER_SYMBOL, period=config.DATA_PERIOD, interval=config.DATA_INTERVAL, progress=False)
+            
+            if not df.empty:
+                # Flatten MultiIndex columns if present (yf.download returns MultiIndex)
+                # This prevents "unsupported format string passed to Series.__format__" errors
+                if isinstance(df.columns, pd.MultiIndex):
+                    df.columns = df.columns.get_level_values(0)
+                
+                logger.info(f"✅ Data fetched successfully: {len(df)} candles")
+                return df
+                
+            # If empty, wait and retry
+            logger.warning(f"Attempt {i+1}/{config.MAX_RETRIES}: Empty data received, retrying...")
+            time.sleep(config.RETRY_DELAY_SECONDS)
+            
+        except Exception as e:
+            logger.error(f"Attempt {i+1}/{config.MAX_RETRIES} failed: {str(e)}")
+            if i == config.MAX_RETRIES - 1: # Last attempt
+                st.error(f"❌ Failed to fetch data after {config.MAX_RETRIES} attempts: {str(e)}")
+                st.stop()
+            time.sleep(1)
+            
+    st.error("❌ Failed to fetch data from Yahoo Finance (Empty Data)")
+    st.stop()
+
+# ==================== DATA VALIDATION ====================
+def validate_data_for_prediction(df, min_rows=config.MIN_DATA_ROWS):
     """
-    Mengambil data Bitcoin live dari Yahoo Finance.
-    - Ticker: BTC-USD
-    - Interval: 15 menit
-    - Period: 5 hari terakhir (untuk perhitungan indikator)
+    Validate if data is suitable for LSTM prediction
+    Returns: (is_valid: bool, message: str)
     """
-    try:
-        btc = yf.Ticker("BTC-USD")
-        # Download data 5 hari terakhir dengan interval 15 menit
-        df = btc.history(period="5d", interval="15m")
-        
-        if df.empty:
-            st.error("❌ Tidak bisa mengambil data dari Yahoo Finance!")
-            st.stop()
-        
-        return df
-    except Exception as e:
-        st.error(f"❌ Error downloading data: {str(e)}")
-        st.stop()
+    logger.info("Validating data for prediction...")
+    
+    # Check 1: DataFrame not empty
+    if df is None or df.empty:
+        logger.error("Validation failed: Empty DataFrame")
+        return False, "❌ Data kosong. Tidak bisa melakukan prediksi."
+    
+    # Check 2: Required columns exist
+    required_cols = ['Open', 'High', 'Low', 'Close']
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    if missing_cols:
+        return False, f"❌ Kolom yang diperlukan tidak ada: {', '.join(missing_cols)}"
+    
+    # Check 3: Sufficient data points
+    if len(df) < min_rows:
+        return False, f"❌ Data tidak cukup untuk prediksi. Diperlukan minimal {min_rows} candle, tersedia {len(df)}."
+    
+    # Check 4: No NaN values in critical columns
+    if df[required_cols].isnull().any().any():
+        nan_cols = df[required_cols].columns[df[required_cols].isnull().any()].tolist()
+        return False, f"❌ Data mengandung nilai kosong (NaN) pada kolom: {', '.join(nan_cols)}"
+    
+    # Check 5: Price values are positive
+    if (df['Close'] <= 0).any():
+        return False, "❌ Data harga mengandung nilai negatif atau nol. Data tidak valid."
+    
+    # Check 6: Reasonable price range (sanity check for BTC)
+    min_price = df['Close'].min()
+    max_price = df['Close'].max()
+    if min_price < config.MIN_PRICE_USD or max_price > config.MAX_PRICE_USD:
+        logger.error(f"Validation failed: Price out of range (${min_price:,.0f} - ${max_price:,.0f})")
+        return False, f"❌ Harga di luar rentang wajar (${min_price:,.0f} - ${max_price:,.0f}). Kemungkinan data corrupt."
+    
+    # All checks passed
+    logger.info("✅ Data validation passed")
+    return True, "✅ Data valid untuk prediksi."
 
 # ==================== FEATURE ENGINEERING ====================
+@st.cache_data(ttl=config.CACHE_TTL_INDICATORS, show_spinner=False)
 def calculate_technical_indicators(df):
     """
-    Menghitung indikator teknikal yang SAMA PERSIS dengan saat training:
-    - RSI (Length 14)
-    - MACD (Fast 12, Slow 26, Signal 9)
+    Calculate ONLY technical indicators used in Thesis:
+    - RSI (14)
+    - MACD (12, 26, 9)
     
-    PENTING: Urutan kolom harus sesuai: ['Close', 'RSI', 'MACD', 'MACD_Signal']
+    Cached for 5 minutes to improve performance.
     """
-    df_features = df[['Close']].copy()
+    logger.info(f"Calculating technical indicators for {len(df)} candles")
     
-    # Hitung RSI dengan length 14
-    df_features['RSI_14'] = ta.rsi(df['Close'], length=14)
+    df_features = df.copy()
     
-    # Hitung MACD dengan parameter standar (12, 26, 9)
-    macd = ta.macd(df['Close'], fast=12, slow=26, signal=9)
-    df_features['MACD_12_26_9'] = macd['MACD_12_26_9']
-    df_features['MACDs_12_26_9'] = macd['MACDs_12_26_9']
+    # RSI (14) using manual function
+    df_features['RSI_14'] = calculate_rsi(df_features['Close'], period=config.RSI_LENGTH)
+    logger.debug(f"RSI calculated: {df_features['RSI_14'].iloc[-1]:.2f}")
     
-    # Drop NaN values yang muncul dari perhitungan indikator
+    # MACD (12, 26, 9) using manual function
+    # Note: calculate_macd returns (macd_line, signal_line, histogram)
+    macd_line, signal_line, histogram = calculate_macd(
+        df_features['Close'], 
+        fast=config.MACD_FAST, 
+        slow=config.MACD_SLOW, 
+        signal=config.MACD_SIGNAL
+    )
+    
+    df_features['MACD_12_26_9'] = macd_line
+    df_features['MACDs_12_26_9'] = signal_line
+    logger.debug(f"MACD calculated: {macd_line.iloc[-1]:.4f}")
+    
     df_features = df_features.dropna()
     
-    return df_features
+    # Filter columns for model
+    # Model trained on: ['Close', 'RSI_14', 'MACD_12_26_9', 'MACDs_12_26_9']
+    df_model = df_features[['Close', 'RSI_14', 'MACD_12_26_9', 'MACDs_12_26_9']].copy()
+    
+    logger.info(f"Technical indicators calculated successfully. Output rows: {len(df_model)}")
+    return df_features, df_model
 
-# ==================== PREDIKSI HARGA ====================
-def predict_next_price(df_features, model, scaler, sequence_length=60):
-    """
-    Memprediksi harga Close berikutnya menggunakan model LSTM.
+# ==================== ASSETS ====================
+def get_bitcoin_logo_base64():
+    # SVG string content
+    svg = """<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="100%" height="100%" version="1.1" shape-rendering="geometricPrecision" text-rendering="geometricPrecision" image-rendering="optimizeQuality" fill-rule="evenodd" clip-rule="evenodd" viewBox="0 0 4091.27 4091.73" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xodm="http://www.corel.com/coreldraw/odm/2003"><g id="Layer_x0020_1"><metadata id="CorelCorpID_0Corel-Layer"/><g id="_1421344023328"><path fill="#F7931A" fill-rule="nonzero" d="M4030.06 2540.77c-273.24,1096.01 -1383.32,1763.02 -2479.46,1489.71 -1095.68,-273.24 -1762.69,-1383.39 -1489.33,-2479.31 273.12,-1096.13 1383.2,-1763.19 2479,-1489.95 1096.06,273.24 1763.03,1383.51 1489.76,2479.57l0.02 -0.02z"/><path fill="white" fill-rule="nonzero" d="M2947.77 1754.38c40.72,-272.26 -166.56,-418.61 -450,-516.24l91.95 -368.8 -224.5 -55.94 -89.51 359.09c-59.02,-14.72 -119.63,-28.59 -179.87,-42.34l90.16 -361.46 -224.36 -55.94 -92 368.68c-48.84,-11.12 -96.81,-22.11 -143.35,-33.69l0.26 -1.16 -309.59 -77.31 -59.72 239.78c0,0 166.56,38.18 163.05,40.53 90.91,22.69 107.35,82.87 104.62,130.57l-104.74 420.15c6.26,1.59 14.38,3.89 23.34,7.49 -7.49,-1.86 -15.46,-3.89 -23.73,-5.87l-146.81 588.57c-11.11,27.62 -39.31,69.07 -102.87,53.33 2.25,3.26 -163.17,-40.72 -163.17,-40.72l-111.46 256.98 292.15 72.83c54.35,13.63 107.61,27.89 160.06,41.3l-92.9 373.03 224.24 55.94 92 -369.07c61.26,16.63 120.71,31.97 178.91,46.43l-91.69 367.33 224.51 55.94 92.89 -372.33c382.82,72.45 670.67,43.24 791.83,-303.02 97.63,-278.78 -4.86,-439.58 -206.26,-544.44 146.69,-33.83 257.18,-130.31 286.64,-329.61l-0.07 -0.05zm-512.93 719.26c-69.38,278.78 -538.76,128.08 -690.94,90.29l123.28 -494.2c152.17,37.99 640.17,113.17 567.67,403.91zm69.43 -723.3c-63.29,253.58 -453.96,124.75 -580.69,93.16l111.77 -448.21c126.73,31.59 534.85,90.55 468.94,355.05l-0.02 0z"/></g></g></svg>"""
+    return base64.b64encode(svg.encode('utf-8')).decode('utf-8')
+
+
+# ==================== LSTM PREDICTION ====================
+def predict_next_price(df_model, model, scaler, sequence_length=config.SEQUENCE_LENGTH):
+    logger.info(f"Starting LSTM prediction with sequence length: {sequence_length}")
     
-    Args:
-        df_features: DataFrame dengan 4 kolom ['Close', 'RSI_14', 'MACD_12_26_9', 'MACDs_12_26_9']
-        model: Model LSTM yang sudah dilatih
-        scaler: MinMaxScaler yang di-fit dengan 4 kolom saat training
-        sequence_length: Panjang sequence (default 60)
-    
-    Returns:
-        predicted_price: Harga prediksi dalam USD
-        confidence: Confidence score (0-100%)
-        scenarios: Dictionary dengan best/worst/likely case
-    """
-    # Pastikan kita punya cukup data (minimal 60 baris)
-    if len(df_features) < sequence_length:
-        st.error(f"❌ Data tidak cukup! Butuh minimal {sequence_length} baris, tapi hanya ada {len(df_features)}.")
+    if len(df_model) < sequence_length:
+        logger.error(f"Insufficient data: {len(df_model)} rows (need {sequence_length})")
+        st.error(f"❌ Data insufficient! Need {sequence_length} rows.")
         return None, None, None
     
-    # Ambil 60 baris terakhir
-    last_sequence = df_features.iloc[-sequence_length:].values
-    
-    # Transform menggunakan scaler (0-1 normalization)
+    # Take last 60 rows
+    last_sequence = df_model.iloc[-sequence_length:].values
     last_sequence_scaled = scaler.transform(last_sequence)
-    
-    # Reshape untuk input LSTM: (batch_size=1, sequence_length=60, features=4)
     X_input = last_sequence_scaled.reshape(1, sequence_length, 4)
     
-    # Prediksi menggunakan model
+    logger.debug(f"Input shape: {X_input.shape}")
     prediction_scaled = model.predict(X_input, verbose=0)
     
-    # ==================== INVERSE TRANSFORM (BAGIAN KRUSIAL) ====================
-    # Masalah: prediction_scaled shape = (1, 1) -> hanya satu nilai (Close dalam skala 0-1)
-    # Tapi scaler.inverse_transform() butuh input shape (1, 4) karena di-fit dengan 4 kolom
-    
-    # Solusi: Buat dummy array dengan 4 kolom, isi dengan 0
+    # Inverse Transform Logic
     dummy_array = np.zeros((1, 4))
-    
-    # Masukkan nilai prediksi ke kolom pertama (index 0 = Close)
     dummy_array[0, 0] = prediction_scaled[0, 0]
-    
-    # Inverse transform untuk mendapatkan harga asli dalam USD
-    # Kita hanya ambil kolom pertama (Close) dari hasil inverse transform
     predicted_price = scaler.inverse_transform(dummy_array)[0, 0]
     
-    # ==================== HITUNG CONFIDENCE SCORE ====================
-    # Confidence berdasarkan konsistensi trend dari sequence terakhir
-    recent_prices = df_features['Close'].iloc[-10:].values  # 10 candle terakhir
+    logger.info(f"Raw prediction: ${predicted_price:,.2f}")
+    
+    # Confidence Calculation (Standard deviation/Trend based)
+    recent_prices = df_model['Close'].iloc[-10:].values
     price_changes = np.diff(recent_prices)
-    
-    # Hitung volatilitas (standar deviasi perubahan harga)
     volatility = np.std(price_changes)
+    trend_consistency = np.abs(np.sum(np.sign(price_changes))) / len(price_changes)
     
-    # Hitung trend consistency (berapa banyak candle searah)
-    trend_direction = np.sign(price_changes)
-    trend_consistency = np.abs(np.sum(trend_direction)) / len(trend_direction)
-    
-    # Confidence: tinggi jika volatilitas rendah dan trend konsisten
-    # Formula: base 50% + (trend_consistency * 30%) - (volatility_factor * 20%)
     volatility_factor = min(volatility / np.mean(recent_prices) * 100, 1.0)
-    confidence = 50 + (trend_consistency * 30) - (volatility_factor * 20)
-    confidence = max(40, min(85, confidence))  # Clamp antara 40-85%
+    confidence = config.CONFIDENCE_BASE + (trend_consistency * config.CONFIDENCE_TREND_WEIGHT) - (volatility_factor * config.CONFIDENCE_VOLATILITY_WEIGHT)
+    confidence = max(config.CONFIDENCE_MIN, min(config.CONFIDENCE_MAX, confidence))
     
-    # ==================== HITUNG SKENARIO ====================
-    current_price = df_features['Close'].iloc[-1]
+    logger.info(f"Confidence score: {confidence:.1f}% (volatility: {volatility:.2f}, trend: {trend_consistency:.2f})")
     
-    # Best case: prediksi + 1.5x pergerakan rata-rata
+    current_price = df_model['Close'].iloc[-1]
     avg_move = np.mean(np.abs(price_changes))
-    best_case = predicted_price + (avg_move * 1.5)
-    
-    # Worst case: prediksi - 1.5x pergerakan rata-rata
-    worst_case = predicted_price - (avg_move * 1.5)
-    
-    # Most likely: weighted average (70% prediksi, 30% harga saat ini)
-    most_likely = (predicted_price * 0.7) + (current_price * 0.3)
     
     scenarios = {
-        'best': best_case,
-        'worst': worst_case,
-        'likely': most_likely
+        'best': predicted_price + (avg_move * 1.5),
+        'worst': predicted_price - (avg_move * 1.5),
+        'likely': (predicted_price * 0.7) + (current_price * 0.3)
     }
     
+    logger.info(f"Prediction complete: ${predicted_price:,.2f} (Confidence: {confidence:.1f}%)")
     return predicted_price, confidence, scenarios
 
 # ==================== VISUALISASI PATTERN 60 CANDLE ====================
@@ -194,7 +347,7 @@ def create_pattern_chart(df_features, sequence_length=60):
         mode='lines+markers',
         name='Close Price',
         line=dict(color='#00D9FF', width=3),
-        marker=dict(size=4)
+        marker=dict(size=5)
     ))
     
     # Highlight 10 candle terakhir (paling berpengaruh)
@@ -203,278 +356,465 @@ def create_pattern_chart(df_features, sequence_length=60):
         x=list(range(len(pattern_data)-10, len(pattern_data))),
         y=last_10['Close'],
         mode='markers',
-        name='Recent Pattern',
-        marker=dict(size=8, color='#FF6B6B', symbol='circle')
+        name='Recent Trend (Most Important)',
+        marker=dict(size=10, color='#FF6B6B', symbol='circle')
     ))
     
     fig.update_layout(
-        title="📊 60 Candle Pattern (Input Model LSTM)",
-        xaxis_title="Candle Index (0 = 15 jam lalu, 59 = sekarang)",
+        xaxis_title="Candle Index (0 = Oldest, 59 = Current)",
         yaxis_title="Price (USD)",
-        height=400,
+        height=500,  # Increased from 350 to 500
         hovermode='x unified',
         showlegend=True,
-        plot_bgcolor='rgba(0,0,0,0.05)'
+        plot_bgcolor='rgba(0,0,0,0.05)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#E0E0E0', size=12),
+        margin=dict(l=50, r=50, t=20, b=50)
     )
+    
+    # Add grid for better readability
+    fig.update_xaxes(showgrid=True, gridcolor='rgba(255,255,255,0.1)')
+    fig.update_yaxes(showgrid=True, gridcolor='rgba(255,255,255,0.1)')
     
     return fig
 
-# ==================== VISUALISASI CHART ====================
-def create_price_chart(df, df_features):
-    """
-    Membuat chart interaktif dengan Plotly untuk menampilkan:
-    - Candlestick harga Bitcoin
-    - Indikator RSI dan MACD
-    """
-    # Ambil data terakhir 100 candles untuk visualisasi
-    df_viz = df.iloc[-100:].copy()
-    df_feat_viz = df_features.iloc[-100:].copy()
+# ==================== VISUALISASI CHART UTAMA ====================
+def create_main_chart(df, df_features):
+    # Slice last 100 candles
+    df_viz = df.iloc[-100:]
+    df_feat = df_features.iloc[-100:]
     
-    # Buat subplots
     from plotly.subplots import make_subplots
     
+    # Create Subplots: Price, RSI, MACD
     fig = make_subplots(
         rows=3, cols=1,
         shared_xaxes=True,
         vertical_spacing=0.05,
         row_heights=[0.5, 0.25, 0.25],
-        subplot_titles=('Bitcoin Price (15m)', 'RSI (14)', 'MACD')
+        subplot_titles=('Price Action', 'RSI (14)', 'MACD (12,26,9)')
     )
     
-    # Candlestick Chart
-    fig.add_trace(
-        go.Candlestick(
-            x=df_viz.index,
-            open=df_viz['Open'],
-            high=df_viz['High'],
-            low=df_viz['Low'],
-            close=df_viz['Close'],
-            name='BTC-USD'
-        ),
-        row=1, col=1
-    )
+    # 1. Candlestick
+    fig.add_trace(go.Candlestick(
+        x=df_viz.index,
+        open=df_viz['Open'], high=df_viz['High'], low=df_viz['Low'], close=df_viz['Close'],
+        name='Bitcoin',
+        increasing_line_color='#00FF88', decreasing_line_color='#FF3B69'
+    ), row=1, col=1)
     
-    # RSI
-    fig.add_trace(
-        go.Scatter(
-            x=df_feat_viz.index,
-            y=df_feat_viz['RSI_14'],
-            mode='lines',
-            name='RSI',
-            line=dict(color='purple', width=2)
-        ),
-        row=2, col=1
-    )
+    # 2. RSI
+    fig.add_trace(go.Scatter(
+        x=df_feat.index, y=df_feat['RSI_14'],
+        name='RSI',
+        line=dict(color='#BD00FF', width=2)
+    ), row=2, col=1)
     
-    # RSI Reference Lines (30 dan 70)
-    fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
-    fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
+    # RSI Levels
+    fig.add_hline(y=70, line_dash="dash", line_color="rgba(255, 59, 105, 0.5)", row=2, col=1)
+    fig.add_hline(y=30, line_dash="dash", line_color="rgba(0, 255, 136, 0.5)", row=2, col=1)
     
-    # MACD
-    fig.add_trace(
-        go.Scatter(
-            x=df_feat_viz.index,
-            y=df_feat_viz['MACD_12_26_9'],
-            mode='lines',
-            name='MACD',
-            line=dict(color='blue', width=2)
-        ),
-        row=3, col=1
-    )
+    # 3. MACD with Histogram
+    # Calculate histogram for visualization
+    histogram = df_feat['MACD_12_26_9'] - df_feat['MACDs_12_26_9']
     
-    fig.add_trace(
-        go.Scatter(
-            x=df_feat_viz.index,
-            y=df_feat_viz['MACDs_12_26_9'],
-            mode='lines',
-            name='Signal',
-            line=dict(color='orange', width=2)
-        ),
-        row=3, col=1
-    )
+    # MACD Histogram (Bar Chart)
+    colors = ['#00FF88' if val >= 0 else '#FF3B69' for val in histogram]
+    fig.add_trace(go.Bar(
+        x=df_feat.index, y=histogram,
+        name='Histogram',
+        marker_color=colors,
+        opacity=0.5
+    ), row=3, col=1)
     
-    # Update layout
+    # MACD Line
+    fig.add_trace(go.Scatter(
+        x=df_feat.index, y=df_feat['MACD_12_26_9'],
+        name='MACD',
+        line=dict(color='#00D9FF', width=2)
+    ), row=3, col=1)
+    
+    # Signal Line
+    fig.add_trace(go.Scatter(
+        x=df_feat.index, y=df_feat['MACDs_12_26_9'],
+        name='Signal',
+        line=dict(color='#FF9900', width=2)
+    ), row=3, col=1)
+    
     fig.update_layout(
-        height=800,
-        showlegend=True,
-        xaxis_rangeslider_visible=False,
+        height=700,
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(showgrid=False, color='#888'),
+        yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.05)', color='#888'),
+        legend=dict(orientation="h", y=1.02, x=0.5, xanchor="center"),
+        margin=dict(l=20, r=20, t=40, b=20),
         hovermode='x unified'
     )
     
-    fig.update_yaxes(title_text="Price (USD)", row=1, col=1)
-    fig.update_yaxes(title_text="RSI", row=2, col=1)
-    fig.update_yaxes(title_text="MACD", row=3, col=1)
-    
     return fig
 
-# ==================== MAIN DASHBOARD ====================
+# ==================== MAIN APP LAYOUT ====================
 def main():
-    # Header
-    st.title("💰 Bitcoin Intraday Predictor (AI-Powered)")
-    st.markdown("---")
-    
-    # Sidebar Info
+    # --- Sidebar ---
     with st.sidebar:
-        st.header("📊 Info Model")
-        st.info("""
-        **Model:** LSTM Deep Learning  
+        # Rotating Logo in Sidebar
+        logo_b64 = get_bitcoin_logo_base64()
+        st.markdown(f"""
+            <div style="display: flex; justify-content: center; margin-bottom: 20px;">
+                <img src="data:image/svg+xml;base64,{logo_b64}" 
+                     style="width: 120px; height: 120px; animation: spin 4s linear infinite;">
+            </div>
+            <style>
+                @keyframes spin {{ 
+                    from {{ transform: rotate(0deg); }} 
+                    to {{ transform: rotate(360deg); }} 
+                }}
+            </style>
+        """, unsafe_allow_html=True)
+        
+        st.title("⚡ SKRIPSI DASHBOARD")
+        st.info("**Algoritma:** LSTM\n**Indikator:** RSI & MACD")
+        
+        st.write("---")
+        
+        # Model Performance Metrics
+        st.subheader("📊 Model Info")
+        st.markdown("""
+        **Architecture:** LSTM (60 timesteps)  
         **Features:** Close, RSI, MACD, Signal  
-        **Timeframe:** 15 Menit  
-        **Sequence Length:** 60  
+        **Training Period:** Historical BTC Data  
+        **Prediction Horizon:** 15 Minutes  
+        **Estimated Accuracy:** 55-65%  
         """)
         
-        st.markdown("---")
-        st.header("⚙️ Settings")
-        auto_refresh = st.checkbox("Auto Refresh (60s)", value=False)
+        st.write("---")
+        st.subheader("⚙️ Settings")
         
-        if auto_refresh:
+        # Force Refresh Button
+        if st.button("🔄 Force Refresh Data", use_container_width=True):
+            st.cache_data.clear()
+            st.success("✅ Cache cleared! Reloading fresh data...")
             st.rerun()
-    
-    # Ambil data live
-    with st.spinner("🔄 Mengambil data Bitcoin live..."):
+        
+        # Auto-Refresh Toggle
+        refresh = st.checkbox("Auto-Refresh (Live Mode)", value=False)
+        if refresh:
+            st.rerun()
+        
+        # Author Credit (Sidebar)
+        st.write("---")
+        st.markdown("""
+        <div style="padding: 15px; background: linear-gradient(135deg, rgba(0, 217, 255, 0.1), rgba(189, 0, 255, 0.1)); 
+                    border-radius: 10px; border: 1px solid rgba(0, 217, 255, 0.3); text-align: center;">
+            <div style="font-size: 0.7rem; color: #888; margin-bottom: 5px;">DEVELOPED BY</div>
+            <div style="font-size: 1rem; font-weight: bold; color: #00D9FF; margin-bottom: 3px;">Ahmad Nur Fauzan</div>
+            <div style="font-size: 0.8rem; color: #BD00FF;">NIM: 2209106057</div>
+            <div style="font-size: 0.7rem; color: #888; margin-top: 8px;">Skripsi - Informatika</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # --- Header ---
+    col_h1, col_h2 = st.columns([3, 1])
+    with col_h1:
+        # Static logo in header
+        logo_b64 = get_bitcoin_logo_base64()
+        st.markdown(f"""
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <img src="data:image/svg+xml;base64,{logo_b64}" style="width: 60px; height: 60px;">
+                <div>
+                    <h1 style="margin: 0; padding: 0; font-size: 2.5rem;">BTC Intraday Prediction</h1>
+                    <p style="margin: 5px 0 0 0; color: #BBB; font-size: 1rem; font-style: italic;">
+                        Rancang Bangun Dashboard Prediksi Harga Bitcoin Intraday Menggunakan LSTM Berbasis RSI & MACD
+                    </p>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    with col_h2:
+        # Live Clock using Components (Reliable Iframe)
+        clock_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+            <style>
+                body {{
+                    background-color: transparent;
+                    margin: 0;
+                    padding: 0;
+                    text-align: right;
+                    font-family: 'JetBrains Mono', monospace;
+                }}
+                .clock-container {{
+                    padding-top: 20px;
+                }}
+                #clock {{
+                    font-size: 24px;
+                    color: #00D9FF;
+                    font-weight: bold;
+                    text-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
+                }}
+                .label {{
+                    font-size: 12px;
+                    color: #888;
+                    margin-top: 4px;
+                    font-family: sans-serif;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="clock-container">
+                <div id="clock">Loading...</div>
+                <div class="label">SERVER TIME (UTC)</div>
+            </div>
+            <script>
+                function updateClock() {{
+                    var now = new Date();
+                    var time = now.toISOString().split('T')[1].split('.')[0];
+                    document.getElementById('clock').innerHTML = time;
+                }}
+                setInterval(updateClock, 1000);
+                updateClock();
+            </script>
+        </body>
+        </html>
+        """
+        components.html(clock_html, height=100)
+
+    # --- Data Loading ---
+    with st.spinner("📡 Fetching Market Data..."):
         df_raw = get_live_bitcoin_data()
-        df_features = calculate_technical_indicators(df_raw)
-    
-    # Display current price
+        df_full, df_model = calculate_technical_indicators(df_raw)
+
+    # --- Metrics Row ---
     current_price = df_raw['Close'].iloc[-1]
-    current_time = df_raw.index[-1]
+    prev_price = df_raw['Close'].iloc[-2]
+    delta = current_price - prev_price
     
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
+    m1, m2, m3 = st.columns(3)
+    with m1:
         st.metric(
-            label="💵 Harga Bitcoin Saat Ini",
-            value=f"${current_price:,.2f}",
-            delta=f"{df_raw['Close'].iloc[-1] - df_raw['Close'].iloc[-2]:,.2f}"
+            "Bitcoin Price", 
+            f"${current_price:,.2f}", 
+            f"{delta:+.2f}",
+            help="Harga Bitcoin saat ini dalam USD. Delta menunjukkan perubahan dari candle sebelumnya (15 menit yang lalu)."
+        )
+    with m2:
+        rsi_val = df_full['RSI_14'].iloc[-1]
+        rsi_status = "🔴 Overbought" if rsi_val > 70 else "🟢 Oversold" if rsi_val < 30 else "⚪ Netral"
+        st.metric(
+            "RSI (14)", 
+            f"{rsi_val:.1f}", 
+            delta=None,
+            help=f"Relative Strength Index (14 periode). Nilai saat ini: {rsi_status}. "
+                 f"RSI > 70 = Overbought (potensi turun), RSI < 30 = Oversold (potensi naik)."
+        )
+    with m3:
+        # MACD Histogram as delta
+        macd_val = df_full['MACD_12_26_9'].iloc[-1]
+        signal_val = df_full['MACDs_12_26_9'].iloc[-1]
+        hist = macd_val - signal_val
+        momentum = "🟢 Bullish" if hist > 0 else "🔴 Bearish"
+        st.metric(
+            "MACD", 
+            f"{macd_val:.2f}", 
+            f"{hist:.2f} (Hist)",
+            help=f"Moving Average Convergence Divergence (12,26,9). Histogram: {momentum}. "
+                 f"Histogram > 0 = Momentum naik, Histogram < 0 = Momentum turun."
         )
     
-    with col2:
-        st.metric(
-            label="📈 RSI (14)",
-            value=f"{df_features['RSI_14'].iloc[-1]:.2f}"
-        )
+    # Timestamp Info
+    last_candle_time = df_raw.index[-1]
+    next_candle_time = last_candle_time + timedelta(minutes=15)
     
-    with col3:
-        st.metric(
-            label="📊 MACD",
-            value=f"{df_features['MACD_12_26_9'].iloc[-1]:.2f}"
-        )
+    st.caption(f"📅 **Data Terakhir:** {last_candle_time.strftime('%Y-%m-%d %H:%M:%S')} UTC | "
+               f"🔮 **Prediksi Untuk:** {next_candle_time.strftime('%H:%M')} UTC")
+
+    # --- Main Chart ---
+    st.plotly_chart(create_main_chart(df_raw, df_full), use_container_width=True)
+
+    # --- Prediction Core ---
+    st.markdown("### 🧬 LSTM Prediction Core")
     
-    st.caption(f"⏰ Data terakhir update: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    col_pred_btn, col_pred_res = st.columns([1, 3])
     
-    st.markdown("---")
-    
-    # Tombol Prediksi
-    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
-    
-    with col_btn2:
-        predict_button = st.button("🔮 Prediksi 15 Menit ke Depan", use_container_width=True, type="primary")
-    
-    if predict_button:
-        with st.spinner("🤖 Model sedang memprediksi..."):
-            predicted_price, confidence, scenarios = predict_next_price(df_features, model, scaler)
+    with col_pred_btn:
+        if st.button("🚀 RUN PREDICTION MODEL", use_container_width=True, type="primary"):
+            # Validate data first
+            is_valid, validation_msg = validate_data_for_prediction(df_raw, min_rows=60)
             
-            if predicted_price is not None:
-                # Hitung selisih
-                price_diff = predicted_price - current_price
-                price_diff_pct = (price_diff / current_price) * 100
-                
-                st.success("✅ Prediksi Berhasil!")
-                
-                # Display prediction results dengan confidence
-                pred_col1, pred_col2, pred_col3, pred_col4 = st.columns(4)
-                
-                with pred_col1:
-                    st.metric(
-                        label="🎯 Harga Prediksi",
-                        value=f"${predicted_price:,.2f}"
-                    )
-                
-                with pred_col2:
-                    st.metric(
-                        label="📊 Selisih (USD)",
-                        value=f"${price_diff:,.2f}",
-                        delta=f"{price_diff_pct:.2f}%"
-                    )
-                
-                with pred_col3:
-                    # Confidence dengan warna dinamis
-                    conf_color = "🟢" if confidence >= 70 else "🟡" if confidence >= 55 else "🔴"
-                    st.metric(
-                        label="🎲 Confidence",
-                        value=f"{conf_color} {confidence:.1f}%"
-                    )
-                
-                with pred_col4:
-                    if price_diff > 0:
-                        st.success(f"📈 Potensi Profit: ${abs(price_diff):,.2f}")
-                    elif price_diff < 0:
-                        st.error(f"📉 Potensi Loss: ${abs(price_diff):,.2f}")
-                    else:
-                        st.info("➡️ Harga Stabil")
-                
-                st.markdown("---")
-                
-                # Skenario Prediksi
-                st.subheader("📋 Skenario Prediksi (15 Menit ke Depan)")
-                
-                scen_col1, scen_col2, scen_col3 = st.columns(3)
-                
-                with scen_col1:
-                    best_diff = ((scenarios['best'] - current_price) / current_price) * 100
-                    st.success(f"**🚀 Best Case**")
-                    st.metric("Harga", f"${scenarios['best']:,.2f}", delta=f"+{best_diff:.2f}%")
-                
-                with scen_col2:
-                    likely_diff = ((scenarios['likely'] - current_price) / current_price) * 100
-                    st.info(f"**🎯 Most Likely**")
-                    st.metric("Harga", f"${scenarios['likely']:,.2f}", delta=f"{likely_diff:+.2f}%")
-                
-                with scen_col3:
-                    worst_diff = ((scenarios['worst'] - current_price) / current_price) * 100
-                    st.error(f"**⚠️ Worst Case**")
-                    st.metric("Harga", f"${scenarios['worst']:,.2f}", delta=f"{worst_diff:.2f}%")
-                
-                # Interpretasi dengan confidence
-                confidence_text = "TINGGI" if confidence >= 70 else "SEDANG" if confidence >= 55 else "RENDAH"
-                
-                st.warning(f"""
-                **💡 Interpretasi:**  
-                Model memprediksi bahwa dalam **15 menit** ke depan (sekitar **{(current_time + timedelta(minutes=15)).strftime('%H:%M')}**),
-                harga Bitcoin akan {'**NAIK**' if price_diff > 0 else '**TURUN**' if price_diff < 0 else '**STABIL**'} 
-                sebesar **{abs(price_diff_pct):.2f}%**.
-                
-                **Confidence Level: {confidence_text} ({confidence:.1f}%)**
-                
-                ⚠️ **Disclaimer Penting:**
-                - Akurasi LSTM untuk crypto timeframe 15 menit: **55-65%**
-                - Prediksi ini berdasarkan pola historis 60 candle terakhir (15 jam)
-                - Market crypto sangat volatile dan dipengaruhi news/events mendadak
-                - **BUKAN nasihat finansial** - gunakan sebagai referensi saja
-                - Selalu lakukan analisis sendiri sebelum trading
-                """)
-                
-                st.markdown("---")
-                
-                # Visualisasi Pattern 60 Candle
-                st.subheader("🔍 Pattern yang Dilihat Model")
-                st.caption("Model LSTM menganalisis 60 candle terakhir (15 jam) untuk membuat prediksi")
-                pattern_fig = create_pattern_chart(df_features)
-                st.plotly_chart(pattern_fig, use_container_width=True)
-    
-    st.markdown("---")
-    
-    # Chart Visualization
-    st.subheader("📈 Chart Harga & Indikator Teknikal")
-    
-    with st.spinner("📊 Memuat chart..."):
-        fig = create_price_chart(df_raw, df_features)
-        st.plotly_chart(fig, use_container_width=True)
-    
+            if not is_valid:
+                st.error(validation_msg)
+                st.warning("💡 **Saran:** Coba klik tombol 'Force Refresh Data' di sidebar untuk mendapatkan data terbaru.")
+            else:
+                # Data valid, proceed with prediction
+                try:
+                    with st.spinner("⚡ Running LSTM Inference..."):
+                        pred_price, conf, scenarios = predict_next_price(df_model, model, scaler)
+                        
+                        if pred_price:
+                            diff = pred_price - current_price
+                            pct_diff = (diff / current_price) * 100
+                            
+                            st.session_state['last_pred'] = {
+                                'price': pred_price, 'conf': conf, 'scenarios': scenarios,
+                                'diff': diff, 'pct': pct_diff
+                            }
+                            st.success("✅ Prediksi berhasil!")
+                        else:
+                            st.error("❌ Model gagal menghasilkan prediksi. Silakan coba lagi.")
+                            
+                except Exception as e:
+                    st.error(f"❌ **Error saat prediksi:** {str(e)}")
+                    st.warning("💡 **Troubleshooting:**\n"
+                              "1. Pastikan file model (`model_bitcoin_final.keras`) ada\n"
+                              "2. Pastikan file scaler (`scaler_bitcoin.pkl`) ada\n"
+                              "3. Coba refresh data dengan tombol di sidebar")
+                    # Optional: Log error for debugging
+                    import traceback
+                    with st.expander("🔍 Detail Error (untuk debugging)"):
+                        st.code(traceback.format_exc())
+
+    with col_pred_res:
+        if 'last_pred' in st.session_state:
+            res = st.session_state['last_pred']
+            
+            # Prediction Cards
+            pc1, pc2, pc3 = st.columns(3)
+            with pc1:
+                st.markdown(f"""
+                <div style="padding: 15px; background: rgba(0, 217, 255, 0.1); border-radius: 10px; border-left: 4px solid #00D9FF;">
+                    <div style="color: #888; font-size: 0.8rem;">PREDICTED PRICE (+15m)</div>
+                    <div style="font-size: 1.8rem; font-weight: bold; color: #FFF;">${res['price']:,.2f}</div>
+                    <div style="color: {'#00FF88' if res['diff']>0 else '#FF3B69'}; font-weight: bold;">
+                        {res['diff']:+.2f} ({res['pct']:+.2f}%)
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with pc2:
+                 st.markdown(f"""
+                <div style="padding: 15px; background: rgba(189, 0, 255, 0.1); border-radius: 10px; border-left: 4px solid #BD00FF;">
+                    <div style="color: #888; font-size: 0.8rem;">MODEL CONFIDENCE</div>
+                    <div style="font-size: 1.8rem; font-weight: bold; color: #FFF;">{res['conf']:.1f}%</div>
+                    <div style="color: #BD00FF; font-size: 0.8rem;">Based on Sequence Stability</div>
+                </div>
+                """, unsafe_allow_html=True)
+                 
+            with pc3:
+                st.markdown(f"""
+                <div style="padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 10px;">
+                    <div style="color: #888; font-size: 0.8rem;">SCENARIO ANALYSIS</div>
+                    <div style="font-size: 0.9rem; margin-top: 5px;">
+                        <span style="color: #00FF88;">🚀 Best: ${res['scenarios']['best']:,.0f}</span><br>
+                        <span style="color: #E0E0E0;">🎯 Likely: ${res['scenarios']['likely']:,.0f}</span><br>
+                        <span style="color: #FF3B69;">⚠️ Worst: ${res['scenarios']['worst']:,.0f}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            
+            # --- Interpretation & Disclaimer ---
+            st.markdown("---")
+            
+            # Interpretasi dengan confidence
+            confidence_text = "TINGGI" if res['conf'] >= 70 else "SEDANG" if res['conf'] >= 55 else "RENDAH"
+            direction_text = "NAIK" if res['diff'] > 0 else "TURUN"
+            direction_emoji = "📈" if res['diff'] > 0 else "📉"
+            
+            # Waktu prediksi (+15 menit dari sekarang)
+            pred_time = (datetime.now() + timedelta(minutes=15)).strftime('%H:%M')
+            
+            # Interpretasi AI (Full Width)
+            st.info(f"""
+            **💡 Interpretasi AI:**  
+            Berdasarkan analisis pola LSTM, model memprediksi bahwa dalam **15 menit ke depan** (sekitar pukul **{pred_time}**),  
+            harga Bitcoin berpotensi **{direction_text} {direction_emoji}** sebesar **{abs(res['pct']):.2f}%** menuju level **${res['price']:,.2f}**.
+            
+            **Tingkat Keyakinan (Confidence): {confidence_text} ({res['conf']:.1f}%)**
+            """)
+            
+            # Disclaimer (Full Width)
+            st.warning("""
+            **⚠️ Disclaimer Penting:**
+            1. **Akurasi Model:** LSTM untuk timeframe 15 menit memiliki volatilitas tinggi (akurasi estimasi 55-65%).
+            2. **Data Input:** Prediksi ini murni berdasarkan pola historis **60 candle terakhir** (15 jam ke belakang).
+            3. **Faktor Eksternal:** Market crypto sangat dipengaruhi news/event global yang tidak bisa dilihat oleh model ini.
+            4. **Bukan Nasihat Finansial:** Gunakan data ini sebagai referensi pendukung keputusan, bukan acuan tunggal.
+            """)
+            
+            # Pattern Visualizer (Full Width, Larger)
+            st.markdown("---")
+            st.subheader("🔍 60-Candle Pattern (Input Model LSTM)")
+            st.caption("Grafik ini menunjukkan 60 data point terakhir yang 'dilihat' oleh model sebelum membuat prediksi. "
+                      "Model LSTM menganalisis pola Close, RSI, MACD, dan Signal dari 60 candle ini untuk memprediksi harga berikutnya.")
+            
+            # Create larger pattern chart
+            pattern_fig = create_pattern_chart(df_model)
+            st.plotly_chart(pattern_fig, use_container_width=True)
+            
+            # CSV Export Feature
+            st.markdown("---")
+            st.subheader("📥 Export Hasil Prediksi")
+            
+            # Prepare export data with readable column names
+            export_data = {
+                'Date': [datetime.now().strftime('%Y-%m-%d')],
+                'Time': [datetime.now().strftime('%H:%M:%S')],
+                'Current_Price_USD': [round(current_price, 2)],
+                'Predicted_Price_USD': [round(res['price'], 2)],
+                'Price_Change_USD': [round(res['diff'], 2)],
+                'Price_Change_Percent': [round(res['pct'], 2)],
+                'Confidence_Percent': [round(res['conf'], 1)],
+                'Best_Case_USD': [round(res['scenarios']['best'], 2)],
+                'Likely_Case_USD': [round(res['scenarios']['likely'], 2)],
+                'Worst_Case_USD': [round(res['scenarios']['worst'], 2)],
+                'RSI_14': [round(df_full['RSI_14'].iloc[-1], 2)],
+                'MACD': [round(macd_val, 4)],
+                'MACD_Signal': [round(signal_val, 4)]
+            }
+            
+            export_df = pd.DataFrame(export_data)
+            csv = export_df.to_csv(index=False).encode('utf-8')
+            
+            st.download_button(
+                label="💾 Download Prediction Report (CSV)",
+                data=csv,
+                file_name=f"btc_prediction_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+
     # Footer
     st.markdown("---")
-    st.caption("🤖 Powered by LSTM Deep Learning | Data Source: Yahoo Finance")
+    st.markdown("""
+    <div style="text-align: center; padding: 20px; background: rgba(255,255,255,0.02); border-radius: 10px; margin-top: 30px;">
+        <div style="font-size: 1.1rem; font-weight: bold; color: #00D9FF; margin-bottom: 10px;">
+            📊 Bitcoin LSTM Prediction Dashboard
+        </div>
+        <div style="font-size: 0.9rem; color: #BBB; margin-bottom: 15px;">
+            Rancang Bangun Dashboard Prediksi Harga Bitcoin Intraday Menggunakan LSTM Berbasis RSI & MACD
+        </div>
+        <div style="display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin-bottom: 15px;">
+            <div style="font-size: 0.85rem; color: #888;">
+                <span style="color: #BD00FF;">👨‍💻 Developer:</span> Ahmad Nur Fauzan
+            </div>
+            <div style="font-size: 0.85rem; color: #888;">
+                <span style="color: #BD00FF;">🎓 NIM:</span> 2209106057
+            </div>
+            <div style="font-size: 0.85rem; color: #888;">
+                <span style="color: #BD00FF;">🏛️ Program Studi:</span> Informatika
+            </div>
+        </div>
+        <div style="font-size: 0.75rem; color: #666; margin-top: 10px;">
+            Tech Stack: LSTM + RSI + MACD | Data Source: Yahoo Finance | Framework: Streamlit
+        </div>
+        <div style="font-size: 0.7rem; color: #555; margin-top: 8px;">
+            © 2025 Skripsi Project - All Rights Reserved
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-# ==================== RUN APP ====================
 if __name__ == "__main__":
     main()
