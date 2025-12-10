@@ -325,6 +325,298 @@ def create_confidence_gauge(confidence, title="Confidence"):
     return fig
 
 
+# ==================== ACTUAL PRICE UPDATE SYSTEM ====================
+def update_actual_prices(tracker_data, current_df):
+    """
+    Auto-update actual prices for predictions older than 15 minutes.
+    Returns number of predictions updated.
+    """
+    updated_count = 0
+    current_time = datetime.now()
+    current_price = current_df['Close'].iloc[-1]
+    
+    # Update V1 predictions
+    for pred in tracker_data.get('v1_predictions', []):
+        if pred.get('actual_price') is None:
+            pred_time = pred.get('timestamp')
+            if isinstance(pred_time, str):
+                pred_time = datetime.fromisoformat(pred_time)
+            
+            # Check if prediction is older than 15 minutes
+            if pred_time and (current_time - pred_time).total_seconds() >= 900:  # 15 min = 900 sec
+                # Use current price as actual price (simplified)
+                # In production, you'd fetch the exact price at pred_time + 15min
+                pred['actual_price'] = current_price
+                updated_count += 1
+    
+    # Update V2 predictions
+    for pred in tracker_data.get('v2_predictions', []):
+        if pred.get('actual_price') is None:
+            pred_time = pred.get('timestamp')
+            if isinstance(pred_time, str):
+                pred_time = datetime.fromisoformat(pred_time)
+            
+            if pred_time and (current_time - pred_time).total_seconds() >= 900:
+                pred['actual_price'] = current_price
+                updated_count += 1
+    
+    return updated_count
+
+
+def manual_update_all_actual_prices(tracker_data, current_price):
+    """
+    Manually update ALL predictions with current price (for testing/demo).
+    Returns number of predictions updated.
+    """
+    updated_count = 0
+    
+    # Update V1 predictions
+    for pred in tracker_data.get('v1_predictions', []):
+        if pred.get('actual_price') is None:
+            pred['actual_price'] = current_price
+            updated_count += 1
+    
+    # Update V2 predictions
+    for pred in tracker_data.get('v2_predictions', []):
+        if pred.get('actual_price') is None:
+            pred['actual_price'] = current_price
+            updated_count += 1
+    
+    return updated_count
+
+
+# ==================== ACCURACY TREND CHART ====================
+def create_accuracy_trend_chart(tracker_data):
+    """
+    Create trend chart showing V1 vs V2 accuracy over time.
+    Shows directional accuracy, MAE, and RMSE as predictions accumulate.
+    """
+    from plotly.subplots import make_subplots
+    
+    # Calculate cumulative metrics for V1
+    v1_preds = [p for p in tracker_data.get('v1_predictions', []) if p.get('actual_price') is not None]
+    v2_preds = [p for p in tracker_data.get('v2_predictions', []) if p.get('actual_price') is not None]
+    
+    if len(v1_preds) < 2 and len(v2_preds) < 2:
+        return None
+    
+    # Calculate cumulative metrics
+    def calc_cumulative_metrics(predictions):
+        counts = []
+        dir_acc = []
+        mae_vals = []
+        rmse_vals = []
+        
+        for i in range(2, len(predictions) + 1):
+            subset = predictions[:i]
+            counts.append(i)
+            
+            # Directional accuracy
+            correct = sum(1 for p in subset if p.get('direction') == ('up' if p['actual_price'] > p['current_price'] else 'down'))
+            dir_acc.append((correct / i) * 100)
+            
+            # MAE
+            errors = [abs(p['predicted_price'] - p['actual_price']) for p in subset]
+            mae_vals.append(np.mean(errors))
+            
+            # RMSE
+            squared_errors = [(p['predicted_price'] - p['actual_price']) ** 2 for p in subset]
+            rmse_vals.append(np.sqrt(np.mean(squared_errors)))
+        
+        return counts, dir_acc, mae_vals, rmse_vals
+    
+    # Create subplots
+    fig = make_subplots(
+        rows=3, cols=1,
+        subplot_titles=('Directional Accuracy Over Time', 'MAE Over Time', 'RMSE Over Time'),
+        vertical_spacing=0.1,
+        row_heights=[0.33, 0.33, 0.33]
+    )
+    
+    # V1 data
+    if len(v1_preds) >= 2:
+        v1_counts, v1_dir, v1_mae, v1_rmse = calc_cumulative_metrics(v1_preds)
+        
+        # Directional accuracy
+        fig.add_trace(go.Scatter(
+            x=v1_counts, y=v1_dir,
+            name='V1 Directional',
+            line=dict(color='#00D9FF', width=2),
+            mode='lines+markers'
+        ), row=1, col=1)
+        
+        # MAE
+        fig.add_trace(go.Scatter(
+            x=v1_counts, y=v1_mae,
+            name='V1 MAE',
+            line=dict(color='#00D9FF', width=2),
+            mode='lines+markers',
+            showlegend=False
+        ), row=2, col=1)
+        
+        # RMSE
+        fig.add_trace(go.Scatter(
+            x=v1_counts, y=v1_rmse,
+            name='V1 RMSE',
+            line=dict(color='#00D9FF', width=2),
+            mode='lines+markers',
+            showlegend=False
+        ), row=3, col=1)
+    
+    # V2 data
+    if len(v2_preds) >= 2:
+        v2_counts, v2_dir, v2_mae, v2_rmse = calc_cumulative_metrics(v2_preds)
+        
+        # Directional accuracy
+        fig.add_trace(go.Scatter(
+            x=v2_counts, y=v2_dir,
+            name='V2 Directional',
+            line=dict(color='#BD00FF', width=2),
+            mode='lines+markers'
+        ), row=1, col=1)
+        
+        # MAE
+        fig.add_trace(go.Scatter(
+            x=v2_counts, y=v2_mae,
+            name='V2 MAE',
+            line=dict(color='#BD00FF', width=2),
+            mode='lines+markers',
+            showlegend=False
+        ), row=2, col=1)
+        
+        # RMSE
+        fig.add_trace(go.Scatter(
+            x=v2_counts, y=v2_rmse,
+            name='V2 RMSE',
+            line=dict(color='#BD00FF', width=2),
+            mode='lines+markers',
+            showlegend=False
+        ), row=3, col=1)
+    
+    # Update layout
+    fig.update_xaxes(title_text="Number of Predictions", row=3, col=1)
+    fig.update_yaxes(title_text="Accuracy (%)", row=1, col=1)
+    fig.update_yaxes(title_text="MAE ($)", row=2, col=1)
+    fig.update_yaxes(title_text="RMSE ($)", row=3, col=1)
+    
+    fig.update_layout(
+        height=800,
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#E0E0E0'),
+        hovermode='x unified',
+        showlegend=True,
+        legend=dict(orientation="h", y=1.08, x=0.5, xanchor="center")
+    )
+    
+    return fig
+
+
+# ==================== BACKTESTING SYSTEM ====================
+def run_backtest(start_date, end_date, model_v1, scaler_v1, model_v2, scaler_v2):
+    """
+    Run backtesting on historical data for both V1 and V2 models.
+    Returns comprehensive metrics and prediction history.
+    """
+    try:
+        # Fetch historical data
+        ticker = yf.Ticker("BTC-USD")
+        df_hist = ticker.history(start=start_date, end=end_date, interval="15m")
+        
+        if df_hist.empty or len(df_hist) < 100:
+            return None, "Insufficient historical data for selected date range"
+        
+        # Calculate technical indicators
+        df_full, df_model_v1, df_model_v2 = calculate_technical_indicators(df_hist)
+        
+        # Initialize results
+        results = {
+            'v1': {'predictions': [], 'directional_correct': 0, 'total': 0},
+            'v2': {'predictions': [], 'directional_correct': 0, 'total': 0}
+        }
+        
+        # Run predictions on each timestamp (skip last 1 to have actual price)
+        total_points = len(df_model_v1) - 1
+        
+        for i in range(60, total_points):  # Start from 60 to have enough history
+            try:
+                # Get data up to current point
+                df_v1_subset = df_model_v1.iloc[:i+1]
+                df_v2_subset = df_model_v2.iloc[:i+1]
+                
+                # V1 Prediction
+                pred_v1, conf_v1, _ = predict_next_price(df_v1_subset, model_v1, scaler_v1)
+                
+                # V2 Prediction
+                pred_v2, conf_v2, _ = predict_next_price_v2(df_v2_subset, model_v2, scaler_v2)
+                
+                # Get actual price (next timestamp)
+                actual_price = df_hist['Close'].iloc[i+1]
+                current_price = df_hist['Close'].iloc[i]
+                
+                # Calculate errors
+                if pred_v1:
+                    error_v1 = abs(pred_v1 - actual_price)
+                    direction_v1 = 'up' if pred_v1 > current_price else 'down'
+                    actual_direction = 'up' if actual_price > current_price else 'down'
+                    
+                    results['v1']['predictions'].append({
+                        'predicted': pred_v1,
+                        'actual': actual_price,
+                        'error': error_v1,
+                        'direction_correct': direction_v1 == actual_direction
+                    })
+                    
+                    if direction_v1 == actual_direction:
+                        results['v1']['directional_correct'] += 1
+                    results['v1']['total'] += 1
+                
+                if pred_v2:
+                    error_v2 = abs(pred_v2 - actual_price)
+                    direction_v2 = 'up' if pred_v2 > current_price else 'down'
+                    
+                    results['v2']['predictions'].append({
+                        'predicted': pred_v2,
+                        'actual': actual_price,
+                        'error': error_v2,
+                        'direction_correct': direction_v2 == actual_direction
+                    })
+                    
+                    if direction_v2 == actual_direction:
+                        results['v2']['directional_correct'] += 1
+                    results['v2']['total'] += 1
+                    
+            except Exception as e:
+                logger.warning(f"Backtest prediction failed at index {i}: {str(e)}")
+                continue
+        
+        # Calculate final metrics
+        metrics = {}
+        
+        for model_name in ['v1', 'v2']:
+            preds = results[model_name]['predictions']
+            if len(preds) > 0:
+                errors = [p['error'] for p in preds]
+                
+                metrics[model_name] = {
+                    'total_predictions': len(preds),
+                    'directional_accuracy': (results[model_name]['directional_correct'] / results[model_name]['total']) * 100,
+                    'mae': np.mean(errors),
+                    'rmse': np.sqrt(np.mean([e**2 for e in errors])),
+                    'min_error': np.min(errors),
+                    'max_error': np.max(errors),
+                    'median_error': np.median(errors)
+                }
+            else:
+                metrics[model_name] = None
+        
+        return metrics, None
+        
+    except Exception as e:
+        logger.error(f"Backtesting error: {str(e)}")
+        return None, str(e)
+
+
 # ==================== MODEL V2 DOWNLOAD FROM GITHUB RELEASES ====================
 def download_model_v2_files():
     """
@@ -1098,12 +1390,132 @@ def main():
                 }
                 st.success("✅ Tracker reset successfully!")
                 st.rerun()
+            
+            # Manual Update Actual Prices Button (NEW!)
+            st.write("---")
+            if st.button("📊 Update Actual Prices", use_container_width=True, help="Manually update all predictions with current price for testing"):
+                # Set flag in session state to trigger update after data is loaded
+                st.session_state['trigger_manual_update'] = True
+                st.rerun()
+
         else:
             st.info("📊 Run predictions to start tracking performance!")
         
+        # Prediction History & Error Analysis (NEW!)
+        if len(tracker['v1_predictions']) > 0 or len(tracker['v2_predictions']) > 0:
+            st.write("---")
+            with st.expander("📋 Prediction History & Errors", expanded=False):
+                st.caption("View individual prediction errors and identify outliers")
+                
+                # V1 History
+                if len(tracker['v1_predictions']) > 0:
+                    st.markdown("**V1 Predictions:**")
+                    v1_data = []
+                    for i, pred in enumerate(tracker['v1_predictions'][-10:], 1):  # Last 10
+                        if pred.get('actual_price') is not None:
+                            error = abs(pred['predicted_price'] - pred['actual_price'])
+                            direction_correct = "✅" if pred.get('direction') == ('up' if pred['actual_price'] > pred['current_price'] else 'down') else "❌"
+                            v1_data.append({
+                                '#': i,
+                                'Predicted': f"${pred['predicted_price']:.2f}",
+                                'Actual': f"${pred['actual_price']:.2f}",
+                                'Error': f"${error:.2f}",
+                                'Dir': direction_correct
+                            })
+                    
+                    if v1_data:
+                        import pandas as pd
+                        df_v1 = pd.DataFrame(v1_data)
+                        st.dataframe(df_v1, use_container_width=True, hide_index=True)
+                        
+                        # Highlight outliers
+                        errors = [float(d['Error'].replace('$','').replace(',','')) for d in v1_data]
+                        if len(errors) > 2:
+                            mean_error = np.mean(errors)
+                            std_error = np.std(errors)
+                            outliers = [i+1 for i, e in enumerate(errors) if abs(e - mean_error) > 2 * std_error]
+                            if outliers:
+                                st.warning(f"⚠️ Outliers detected: #{', #'.join(map(str, outliers))}")
+                    else:
+                        st.caption("⏳ No verified predictions yet")
+                
+                st.write("---")
+                
+                # V2 History
+                if len(tracker['v2_predictions']) > 0:
+                    st.markdown("**V2 Predictions:**")
+                    v2_data = []
+                    for i, pred in enumerate(tracker['v2_predictions'][-10:], 1):  # Last 10
+                        if pred.get('actual_price') is not None:
+                            error = abs(pred['predicted_price'] - pred['actual_price'])
+                            direction_correct = "✅" if pred.get('direction') == ('up' if pred['actual_price'] > pred['current_price'] else 'down') else "❌"
+                            v2_data.append({
+                                '#': i,
+                                'Predicted': f"${pred['predicted_price']:.2f}",
+                                'Actual': f"${pred['actual_price']:.2f}",
+                                'Error': f"${error:.2f}",
+                                'Dir': direction_correct
+                            })
+                    
+                    if v2_data:
+                        df_v2 = pd.DataFrame(v2_data)
+                        st.dataframe(df_v2, use_container_width=True, hide_index=True)
+                        
+                        # Highlight outliers
+                        errors = [float(d['Error'].replace('$','').replace(',','')) for d in v2_data]
+                        if len(errors) > 2:
+                            mean_error = np.mean(errors)
+                            std_error = np.std(errors)
+                            outliers = [i+1 for i, e in enumerate(errors) if abs(e - mean_error) > 2 * std_error]
+                            if outliers:
+                                st.warning(f"⚠️ Outliers detected: #{', #'.join(map(str, outliers))}")
+                    else:
+                        st.caption("⏳ No verified predictions yet")
+
         st.write("---")
         st.subheader("⚙️ Settings")
         
+        # Backtesting Section (NEW!)
+        with st.expander("🧪 Backtesting Dashboard", expanded=False):
+            st.caption("Test models on historical data")
+            
+            # Date range selector
+            col_date1, col_date2 = st.columns(2)
+            with col_date1:
+                start_date = st.date_input(
+                    "Start Date",
+                    value=datetime.now() - timedelta(days=7),
+                    max_value=datetime.now() - timedelta(days=1)
+                )
+            with col_date2:
+                end_date = st.date_input(
+                    "End Date",
+                    value=datetime.now() - timedelta(days=1),
+                    max_value=datetime.now()
+                )
+            
+            # Run backtest button
+            if st.button("🚀 Run Backtest", use_container_width=True):
+                if start_date >= end_date:
+                    st.error("❌ Start date must be before end date")
+                else:
+                    with st.spinner("⚡ Running backtest... This may take a few minutes..."):
+                        metrics, error = run_backtest(
+                            start_date, end_date,
+                            model, scaler,
+                            model_v2, scaler_v2
+                        )
+                        
+                        if error:
+                            st.error(f"❌ Backtest failed: {error}")
+                        elif metrics:
+                            st.session_state['backtest_results'] = metrics
+                            st.success("✅ Backtest complete! Scroll down to see results.")
+                            st.rerun()
+                        else:
+                            st.error("❌ No results generated")
+        
+
         # Force Refresh Button
         if st.button("🔄 Force Refresh Data", use_container_width=True):
             st.cache_data.clear()
@@ -1261,6 +1673,33 @@ def main():
         df_raw = get_live_bitcoin_data()
         df_full, df_model_v1, df_model_v2 = calculate_technical_indicators(df_raw)
     
+    # Auto-update actual prices for predictions older than 15 minutes (NEW!)
+    if 'performance_tracker' in st.session_state:
+        tracker = st.session_state['performance_tracker']
+        updated_count = update_actual_prices(tracker, df_raw)
+        
+        if updated_count > 0:
+            save_tracker_data(tracker)
+            logger.info(f"Auto-updated {updated_count} predictions with actual prices")
+
+    # Handle manual update trigger (NEW!)
+    if st.session_state.get('trigger_manual_update', False):
+        if 'performance_tracker' in st.session_state:
+            tracker = st.session_state['performance_tracker']
+            current_price = df_raw['Close'].iloc[-1]
+            updated = manual_update_all_actual_prices(tracker, current_price)
+            
+            if updated > 0:
+                save_tracker_data(tracker)
+                st.session_state['performance_tracker'] = tracker
+                st.success(f"✅ Updated {updated} predictions with actual prices!")
+                st.info("💡 Refresh to see updated metrics")
+            else:
+                st.info("ℹ️ All predictions already have actual prices")
+        
+        # Clear the flag
+        st.session_state['trigger_manual_update'] = False
+
     # Select active model based on sidebar choice
     if model_version == "V1 (4 Features)":
         df_model = df_model_v1
@@ -1665,6 +2104,99 @@ def main():
             - V2 confidence is **{abs(comp['difference']['confidence']):.1f}% {'higher' if comp['difference']['confidence'] > 0 else 'lower'}** than V1
             - V2 uses additional features (ATR + Log Volume) for more sophisticated analysis
             """)
+    
+    # Accuracy Trend Chart (NEW!)
+    st.markdown("---")
+    st.markdown("### 📈 Accuracy Trend Analysis")
+    st.caption("Visual proof of V1 vs V2 performance over time")
+    
+    if 'performance_tracker' in st.session_state:
+        tracker = st.session_state['performance_tracker']
+        trend_chart = create_accuracy_trend_chart(tracker)
+        
+        if trend_chart:
+            st.plotly_chart(trend_chart, use_container_width=True)
+            
+            # Insights
+            v1_verified = len([p for p in tracker.get('v1_predictions', []) if p.get('actual_price') is not None])
+            v2_verified = len([p for p in tracker.get('v2_predictions', []) if p.get('actual_price') is not None])
+            
+            st.info(f"""
+            **💡 Trend Insights:**
+            - Chart shows how accuracy evolves as more predictions are verified
+            - V1: {v1_verified} verified predictions
+            - V2: {v2_verified} verified predictions
+            - Look for upward trends in directional accuracy and downward trends in MAE/RMSE
+            """)
+        else:
+            st.info("📊 Need at least 2 verified predictions to show trends. Keep making predictions!")
+    
+    # Backtest Results Display (NEW!)
+    if 'backtest_results' in st.session_state:
+        bt_results = st.session_state['backtest_results']
+        
+        st.markdown("---")
+        st.markdown("### 🧪 Backtesting Results")
+        st.caption("Historical model performance on past data")
+        
+        # Results cards
+        bt_col1, bt_col2, bt_col3 = st.columns(3)
+        
+        with bt_col1:
+            if bt_results.get('v1'):
+                v1 = bt_results['v1']
+                st.markdown(f"""
+                <div style="padding: 15px; background: rgba(0, 217, 255, 0.1); border-radius: 10px; border-left: 4px solid #00D9FF;">
+                    <div style="color: #888; font-size: 0.8rem;">V1 BACKTEST</div>
+                    <div style="font-size: 1.2rem; font-weight: bold; color: #00D9FF;">Directional: {v1['directional_accuracy']:.1f}%</div>
+                    <div style="color: #888; font-size: 0.75rem; margin-top: 5px;">
+                        MAE: ${v1['mae']:.2f}<br>
+                        RMSE: ${v1['rmse']:.2f}<br>
+                        Predictions: {v1['total_predictions']}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        with bt_col2:
+            if bt_results.get('v2'):
+                v2 = bt_results['v2']
+                st.markdown(f"""
+                <div style="padding: 15px; background: rgba(189, 0, 255, 0.1); border-radius: 10px; border-left: 4px solid #BD00FF;">
+                    <div style="color: #888; font-size: 0.8rem;">V2 BACKTEST</div>
+                    <div style="font-size: 1.2rem; font-weight: bold; color: #BD00FF;">Directional: {v2['directional_accuracy']:.1f}%</div>
+                    <div style="color: #888; font-size: 0.75rem; margin-top: 5px;">
+                        MAE: ${v2['mae']:.2f}<br>
+                        RMSE: ${v2['rmse']:.2f}<br>
+                        Predictions: {v2['total_predictions']}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        with bt_col3:
+            if bt_results.get('v1') and bt_results.get('v2'):
+                v1, v2 = bt_results['v1'], bt_results['v2']
+                dir_diff = v2['directional_accuracy'] - v1['directional_accuracy']
+                mae_diff = v2['mae'] - v1['mae']
+                diff_color = "#00FF88" if dir_diff > 0 else "#FF3B69"
+                
+                st.markdown(f"""
+                <div style="padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 10px; border-left: 4px solid {diff_color};">
+                    <div style="color: #888; font-size: 0.8rem;">V2 vs V1</div>
+                    <div style="font-size: 1.2rem; font-weight: bold; color: {diff_color};">Dir: {dir_diff:+.1f}%</div>
+                    <div style="color: #888; font-size: 0.75rem; margin-top: 5px;">
+                        MAE: ${mae_diff:+.2f}<br>
+                        {'✅ V2 Better' if dir_diff > 0 else '⚠️ V1 Better'}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Insights
+        st.info("""
+        **💡 Backtest Insights:**
+        - Results based on historical data (past performance)
+        - Large sample size provides statistical significance
+        - Use these metrics to validate model improvements
+        """)
 
     # Footer
     st.markdown("---")

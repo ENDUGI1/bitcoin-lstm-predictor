@@ -5,56 +5,120 @@
       "predicted_price": 92472.9228908658,
       "current_price": 92066.28125,
       "model_version": "V1 (4 Features)",
-      "direction": "up"
+      "direction": "up",
+      "actual_price": 92234.1796875
     },
     {
       "timestamp": "2025-12-10T21:24:51.438546",
       "predicted_price": 92151.60304080248,
       "current_price": 92120.890625,
       "model_version": "V1 (4 Features)",
-      "direction": "up"
+      "direction": "up",
+      "actual_price": 92234.1796875
     },
     {
       "timestamp": "2025-12-10T21:26:45.111461",
       "predicted_price": 92242.65531967879,
       "current_price": 92191.03125,
       "model_version": "V1 (4 Features)",
-      "direction": "up"
+      "direction": "up",
+      "actual_price": 92234.1796875
     },
     {
       "timestamp": "2025-12-11T00:29:00.837236",
       "predicted_price": 93296.55995303392,
       "current_price": 92343.5546875,
       "model_version": "V1 (4 Features)",
-      "direction": "up"
+      "direction": "up",
+      "actual_price": 92234.1796875
     },
     {
       "timestamp": "2025-12-11T00:29:17.322737",
       "predicted_price": 93296.55995303392,
       "current_price": 92343.5546875,
       "model_version": "V1 (4 Features)",
-      "direction": "up"
+      "direction": "up",
+      "actual_price": 92234.1796875
     },
     {
       "timestamp": "2025-12-11T00:44:17.786585",
       "predicted_price": 93337.65730962754,
       "current_price": 92363.765625,
       "model_version": "V1 (4 Features)",
-      "direction": "up"
+      "direction": "up",
+      "actual_price": 92234.1796875
     },
     {
       "timestamp": "2025-12-11T00:52:39.152443",
       "predicted_price": 93183.15980283023,
       "current_price": 92272.0,
       "model_version": "V1 (4 Features)",
-      "direction": "up"
+      "direction": "up",
+      "actual_price": 92234.1796875
     },
     {
       "timestamp": "2025-12-11T00:53:37.779626",
       "predicted_price": 93277.0092077136,
       "current_price": 92395.03125,
       "model_version": "V1 (4 Features)",
-      "direction": "up"
+      "direction": "up",
+      "actual_price": 92234.1796875
+    },
+    {
+      "timestamp": "2025-12-11T02:33:09.753016",
+      "predicted_price": 93350.43376539946,
+      "current_price": 92234.1796875,
+      "model_version": "V1 (4 Features)",
+      "direction": "up",
+      "actual_price": 92648.7734375
+    },
+    {
+      "timestamp": "2025-12-11T02:36:12.580977",
+      "predicted_price": 93522.71924539804,
+      "current_price": 92490.6796875,
+      "model_version": "V1 (4 Features)",
+      "direction": "up",
+      "actual_price": 92648.7734375
+    },
+    {
+      "timestamp": "2025-12-11T02:39:26.016310",
+      "predicted_price": 93610.20227494239,
+      "current_price": 92648.7734375,
+      "model_version": "V1 (4 Features)",
+      "direction": "up",
+      "actual_price": 92648.7734375
+    },
+    {
+      "timestamp": "2025-12-11T02:39:36.681346",
+      "predicted_price": 93610.20227494239,
+      "current_price": 92648.7734375,
+      "model_version": "V1 (4 Features)",
+      "direction": "up",
+      "actual_price": 92648.7734375
+    },
+    {
+      "timestamp": "2025-12-11T02:47:48.279853",
+      "predicted_price": 93575.91562880874,
+      "current_price": 92584.2265625,
+      "model_version": "V1 (4 Features)",
+      "direction": "up",
+      "actual_price": 92501.7890625
+    },
+    {
+      "timestamp": "2025-12-11T02:49:30.765741",
+      "predicted_price": 93751.12206591367,
+      "current_price": 92729.3515625,
+      "model_version": "V1 (4 Features)",
+      "direction": "up",
+      "actual_price": 92131.0078125
+    },
+    {
+      "timestamp": "2025-12-11T03:07:13.007561",
+      "predicted_price": 93348.19752143025,
+      "current_price": 92131.0078125,
+      "model_version": "V1 (4 Features)",
+      "direction": "up",
+      "actual_price": 92131.0078125
     }
   ],
   "v2_predictions": [
@@ -63,56 +127,112 @@
       "predicted_price": 89887.9341252029,
       "current_price": 92066.28125,
       "model_version": "V2 (6 Features - Enhanced)",
-      "direction": "down"
+      "direction": "down",
+      "actual_price": 92234.1796875
     },
     {
       "timestamp": "2025-12-10T21:25:16.874090",
       "predicted_price": 89832.93854876161,
       "current_price": 92120.890625,
       "model_version": "V2 (6 Features - Enhanced)",
-      "direction": "down"
+      "direction": "down",
+      "actual_price": 92234.1796875
     },
     {
       "timestamp": "2025-12-10T21:26:48.801671",
       "predicted_price": 89876.49067479372,
       "current_price": 92191.03125,
       "model_version": "V2 (6 Features - Enhanced)",
-      "direction": "down"
+      "direction": "down",
+      "actual_price": 92234.1796875
     },
     {
       "timestamp": "2025-12-11T00:29:06.461570",
       "predicted_price": 90901.083758533,
       "current_price": 92343.5546875,
       "model_version": "V2 (6 Features - Enhanced)",
-      "direction": "down"
+      "direction": "down",
+      "actual_price": 92234.1796875
     },
     {
       "timestamp": "2025-12-11T00:29:22.388582",
       "predicted_price": 90901.083758533,
       "current_price": 92343.5546875,
       "model_version": "V2 (6 Features - Enhanced)",
-      "direction": "down"
+      "direction": "down",
+      "actual_price": 92234.1796875
     },
     {
       "timestamp": "2025-12-11T00:44:22.724252",
       "predicted_price": 91039.59248515964,
       "current_price": 92363.765625,
       "model_version": "V2 (6 Features - Enhanced)",
-      "direction": "down"
+      "direction": "down",
+      "actual_price": 92234.1796875
     },
     {
       "timestamp": "2025-12-11T00:52:46.773320",
       "predicted_price": 92174.70118290783,
       "current_price": 92272.0,
       "model_version": "V2 (6 Features - Enhanced)",
-      "direction": "down"
+      "direction": "down",
+      "actual_price": 92234.1796875
     },
     {
       "timestamp": "2025-12-11T00:53:46.521558",
       "predicted_price": 92219.72471376657,
       "current_price": 92395.03125,
       "model_version": "V2 (6 Features - Enhanced)",
-      "direction": "down"
+      "direction": "down",
+      "actual_price": 92234.1796875
+    },
+    {
+      "timestamp": "2025-12-11T02:33:23.762780",
+      "predicted_price": 92934.18645147086,
+      "current_price": 92234.1796875,
+      "model_version": "V2 (6 Features - Enhanced)",
+      "direction": "up",
+      "actual_price": 92648.7734375
+    },
+    {
+      "timestamp": "2025-12-11T02:36:20.132399",
+      "predicted_price": 91986.20839726925,
+      "current_price": 92490.6796875,
+      "model_version": "V2 (6 Features - Enhanced)",
+      "direction": "down",
+      "actual_price": 92648.7734375
+    },
+    {
+      "timestamp": "2025-12-11T02:39:28.857838",
+      "predicted_price": 91972.51413452625,
+      "current_price": 92648.7734375,
+      "model_version": "V2 (6 Features - Enhanced)",
+      "direction": "down",
+      "actual_price": 92648.7734375
+    },
+    {
+      "timestamp": "2025-12-11T02:47:55.235486",
+      "predicted_price": 91827.0053086996,
+      "current_price": 92584.2265625,
+      "model_version": "V2 (6 Features - Enhanced)",
+      "direction": "down",
+      "actual_price": 92501.7890625
+    },
+    {
+      "timestamp": "2025-12-11T02:49:35.144664",
+      "predicted_price": 91986.32494418621,
+      "current_price": 92729.3515625,
+      "model_version": "V2 (6 Features - Enhanced)",
+      "direction": "down",
+      "actual_price": 92131.0078125
+    },
+    {
+      "timestamp": "2025-12-11T03:07:17.450626",
+      "predicted_price": 91627.3822924912,
+      "current_price": 92131.0078125,
+      "model_version": "V2 (6 Features - Enhanced)",
+      "direction": "down",
+      "actual_price": 92131.0078125
     }
   ],
   "v1_correct": 0,
