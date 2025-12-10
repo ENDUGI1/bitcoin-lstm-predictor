@@ -238,6 +238,63 @@ def save_tracker_data(tracker_data):
         logger.error(f"Error saving tracker data: {str(e)}")
         return False
 
+# ==================== MODEL V2 DOWNLOAD FROM GITHUB RELEASES ====================
+def download_model_v2_files():
+    """
+    Download Model V2 files from GitHub Releases if not present locally.
+    This enables V2 model deployment on Streamlit Cloud without Git LFS.
+    """
+    # GitHub Release URLs (UPDATE THESE after creating release!)
+    GITHUB_RELEASE_BASE = "https://github.com/ENDUGI1/bitcoin-lstm-predictor/releases/download/v2.0"
+    MODEL_V2_URL = f"{GITHUB_RELEASE_BASE}/model_bitcoin_v2_6features.keras"
+    SCALER_V2_URL = f"{GITHUB_RELEASE_BASE}/scaler_bitcoin_v2.pkl"
+    
+    model_path = config.MODEL_V2_PATH
+    scaler_path = config.SCALER_V2_PATH
+    
+    # Check if files already exist
+    if os.path.exists(model_path) and os.path.exists(scaler_path):
+        logger.info("Model V2 files already exist locally")
+        return True
+    
+    try:
+        import requests
+        logger.info("Downloading Model V2 files from GitHub Releases...")
+        
+        # Download model file
+        if not os.path.exists(model_path):
+            logger.info(f"Downloading {model_path}...")
+            response = requests.get(MODEL_V2_URL, stream=True, timeout=60)
+            if response.status_code == 200:
+                with open(model_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                logger.info(f"✅ {model_path} downloaded successfully")
+            else:
+                logger.error(f"Failed to download model: HTTP {response.status_code}")
+                return False
+        
+        # Download scaler file
+        if not os.path.exists(scaler_path):
+            logger.info(f"Downloading {scaler_path}...")
+            response = requests.get(SCALER_V2_URL, stream=True, timeout=60)
+            if response.status_code == 200:
+                with open(scaler_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                logger.info(f"✅ {scaler_path} downloaded successfully")
+            else:
+                logger.error(f"Failed to download scaler: HTTP {response.status_code}")
+                return False
+        
+        logger.info("🎉 Model V2 files downloaded successfully!")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error downloading Model V2 files: {str(e)}")
+        logger.warning("Model V2 will not be available. Using V1 only.")
+        return False
+
 # ==================== LOAD MODEL & SCALER ====================
 @st.cache_resource
 def load_model_and_scaler():
@@ -254,6 +311,9 @@ def load_model_and_scaler():
 @st.cache_resource
 def load_model_v2():
     """Load pretrained LSTM model V2 and scaler (6 features)"""
+    # Try to download files from GitHub Releases if not present
+    download_model_v2_files()
+    
     try:
         model_v2 = tf.keras.models.load_model(config.MODEL_V2_PATH)
         scaler_v2 = joblib.load(config.SCALER_V2_PATH)
