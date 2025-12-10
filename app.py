@@ -89,82 +89,171 @@ def inject_custom_css():
     st.markdown("""
         <style>
         /* Import Google Fonts */
-        @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;500;700&family=JetBrains+Mono:wght@400;700&display=swap');
 
-        /* Base Typography */
-        html, body, [class*="css"] {
-            font-family: 'Exo 2', sans-serif !important;
-            color: #E0E0E0;
+        /* --- GLOBAL VARIABLES --- */
+        :root {
+            --primary-color: #00D9FF;
+            --secondary-color: #BD00FF;
+            --success-color: #00FF88;
+            --danger-color: #FF3B69;
+            --bg-color: #0E1117;
+            --card-bg: rgba(18, 22, 31, 0.7);
+            --card-border: 1px solid rgba(255, 255, 255, 0.08);
+            --glass-effect: blur(12px);
         }
 
-        /* Titles and Headers */
+        /* --- TYPOGRAPHY --- */
+        html, body, [class*="css"] {
+            font-family: 'Rajdhani', sans-serif !important;
+            letter-spacing: 0.5px;
+        }
+
         h1, h2, h3 {
-            font-weight: 700;
-            background: linear-gradient(90deg, #00D9FF, #BD00FF);
+            font-family: 'Orbitron', sans-serif !important;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            background: linear-gradient(135deg, #FFF 0%, var(--primary-color) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            text-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
-        }
-        
-        .metric-label {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.8rem;
-            color: #888;
-            text-transform: uppercase;
-        }
-        
-        .metric-value {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #FFF;
+            text-shadow: 0 0 30px rgba(0, 217, 255, 0.2);
         }
 
-        /* Cards/Containers */
-        div[data-testid="stMetric"], div[data-testid="stExpander"] {
-            background-color: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 15px;
-            backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
+        /* --- MAIN CONTAINER --- */
+        .stApp {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(189, 0, 255, 0.05) 0%, transparent 20%),
+                radial-gradient(circle at 90% 80%, rgba(0, 217, 255, 0.05) 0%, transparent 20%);
+        }
+
+        /* --- METRICS CARDS ('stMetric') --- */
+        div[data-testid="stMetric"] {
+            background: var(--card-bg);
+            border: var(--card-border);
+            border-radius: 16px;
+            padding: 20px;
+            backdrop-filter: var(--glass-effect);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        div[data-testid="stMetric"]::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 2px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            opacity: 0.5;
         }
 
         div[data-testid="stMetric"]:hover {
-            border-color: #00D9FF;
-            box-shadow: 0 0 15px rgba(0, 217, 255, 0.2);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 217, 255, 0.15);
+            border-color: rgba(0, 217, 255, 0.3);
         }
 
-        /* Buttons */
-        div.stButton > button {
-            background: linear-gradient(90deg, #00C6FF 0%, #0072FF 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
+        div[data-testid="stMetricLabel"] {
+            font-size: 0.9rem !important;
+            color: #8899A6 !important;
+            font-family: 'Orbitron', sans-serif;
             letter-spacing: 1px;
-            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        div[data-testid="stMetricValue"] {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 2.2rem !important;
+            font-weight: 700;
+            color: #FFF !important;
+            text-shadow: 0 0 10px rgba(255,255,255,0.1);
+        }
+
+        div[data-testid="stMetricDelta"] {
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(0,0,0,0.3);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.8rem !important;
+        }
+
+        /* --- EXPANDERS & CONTAINERS --- */
+        div[data-testid="stExpander"] {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
         }
         
+        div[data-testid="stExpander"]:hover {
+            border-color: var(--primary-color);
+        }
+
+        /* --- BUTTONS --- */
+        div.stButton > button {
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.1) 0%, rgba(189, 0, 255, 0.1) 100%);
+            border: 1px solid rgba(0, 217, 255, 0.5);
+            color: #FFF;
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 2px;
+            border-radius: 8px;
+            padding: 0.75rem 2rem;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+
         div.stButton > button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 114, 255, 0.4);
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            border-color: transparent;
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.4);
+            transform: scale(1.02);
         }
 
         div.stButton > button:active {
-            transform: translateY(0);
+            transform: scale(0.98);
         }
 
-        /* Sidebar */
+        /* --- SIDEBAR --- */
         section[data-testid="stSidebar"] {
-            background-color: #080A10;
-            border-right: 1px solid rgba(255,255,255,0.1);
+            background-color: #050505;
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        section[data-testid="stSidebar"] h1 {
+            background: none;
+            -webkit-text-fill-color: #FFF;
+            font-size: 1.2rem;
+            letter-spacing: 1px;
+            text-shadow: none;
         }
 
-        /* Plotly Chart Background */
+        /* --- ALERTS (INFO, SUCCESS, WARNING) --- */
+        div[data-testid="stAlert"] {
+            border-radius: 12px;
+            background: rgba(18, 22, 31, 0.8);
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        /* --- PLOTLY CHARTS --- */
         .js-plotly-plot .plotly .main-svg {
             background: transparent !important;
         }
         
+        /* --- GAMING/FUTURISTIC SCROLLBAR --- */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0E1117; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333; 
+            border-radius: 5px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-color); 
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -1607,11 +1696,11 @@ def main():
         logo_b64 = get_bitcoin_logo_base64()
         st.markdown(f"""
             <div style="display: flex; align-items: center; gap: 20px;">
-                <img src="data:image/svg+xml;base64,{logo_b64}" style="width: 60px; height: 60px;">
+                <img src="data:image/svg+xml;base64,{logo_b64}" style="width: 70px; height: 70px; filter: drop-shadow(0 0 10px rgba(0, 217, 255, 0.5));">
                 <div>
-                    <h1 style="margin: 0; padding: 0; font-size: 2.5rem;">BTC Intraday Prediction</h1>
-                    <p style="margin: 5px 0 0 0; color: #BBB; font-size: 1rem; font-style: italic;">
-                        Rancang Bangun Dashboard Prediksi Harga Bitcoin Intraday Menggunakan LSTM Berbasis RSI & MACD
+                    <h1 style="margin: 0; padding: 0; font-size: 3rem; background: linear-gradient(135deg, #FFF 0%, var(--primary-color) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">BTC Intraday Prediction</h1>
+                    <p style="margin: 5px 0 0 0; color: #8899A6; font-size: 1.1rem; letter-spacing: 1px; font-family: 'Rajdhani', sans-serif;">
+                        Advanced LSTM Neural Network • RSI & MACD Strategy • V2 Enhanced
                     </p>
                 </div>
             </div>
@@ -1916,10 +2005,10 @@ def main():
             pc1, pc2, pc3 = st.columns(3)
             with pc1:
                 st.markdown(f"""
-                <div style="padding: 15px; background: rgba(0, 217, 255, 0.1); border-radius: 10px; border-left: 4px solid #00D9FF;">
-                    <div style="color: #888; font-size: 0.8rem;">PREDICTED PRICE (+15m)</div>
-                    <div style="font-size: 1.8rem; font-weight: bold; color: #FFF;">${res['price']:,.2f}</div>
-                    <div style="color: {'#00FF88' if res['diff']>0 else '#FF3B69'}; font-weight: bold;">
+                <div style="padding: 20px; background: rgba(0, 217, 255, 0.05); border-radius: 16px; border: 1px solid rgba(0, 217, 255, 0.2); box-shadow: 0 0 20px rgba(0, 217, 255, 0.1);">
+                    <div style="color: #8899A6; font-size: 0.85rem; font-family: 'Orbitron', sans-serif; letter-spacing: 1px;">PREDICTED PRICE (+15m)</div>
+                    <div style="font-size: clamp(1.2rem, 2vw, 2.2rem); font-weight: bold; color: #FFF; font-family: 'JetBrains Mono', monospace; margin: 10px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${res['price']:,.2f}</div>
+                    <div style="display: inline-block; padding: 4px 12px; border-radius: 8px; background: rgba({'0, 255, 136' if res['diff']>0 else '255, 59, 105'}, 0.15); color: {'var(--success-color)' if res['diff']>0 else 'var(--danger-color)'}; font-weight: bold; font-family: 'JetBrains Mono', monospace;">
                         {res['diff']:+.2f} ({res['pct']:+.2f}%)
                     </div>
                 </div>
@@ -1927,23 +2016,23 @@ def main():
             
             with pc2:
                 # Dynamic subtitle based on model version
-                conf_subtitle = "Based on ATR + Volatility" if model_version == "V2 (6 Features - Enhanced)" else "Based on Sequence Stability"
+                conf_subtitle = "ATR + VOLATILITY" if model_version == "V2 (6 Features - Enhanced)" else "SEQUENCE STABILITY"
                 st.markdown(f"""
-                <div style="padding: 15px; background: rgba(189, 0, 255, 0.1); border-radius: 10px; border-left: 4px solid #BD00FF;">
-                    <div style="color: #888; font-size: 0.8rem;">MODEL CONFIDENCE</div>
-                    <div style="font-size: 1.8rem; font-weight: bold; color: #FFF;">{res['conf']:.1f}%</div>
-                    <div style="color: #BD00FF; font-size: 0.8rem;">{conf_subtitle}</div>
+                <div style="padding: 20px; background: rgba(189, 0, 255, 0.05); border-radius: 16px; border: 1px solid rgba(189, 0, 255, 0.2); box-shadow: 0 0 20px rgba(189, 0, 255, 0.1);">
+                    <div style="color: #8899A6; font-size: 0.85rem; font-family: 'Orbitron', sans-serif; letter-spacing: 1px;">MODEL CONFIDENCE</div>
+                    <div style="font-size: 2.2rem; font-weight: bold; color: #FFF; font-family: 'JetBrains Mono', monospace; margin: 10px 0;">{res['conf']:.1f}%</div>
+                    <div style="color: var(--secondary-color); font-size: 0.75rem; letter-spacing: 0.5px; text-transform: uppercase;">{conf_subtitle}</div>
                 </div>
                 """, unsafe_allow_html=True)
                  
             with pc3:
                 st.markdown(f"""
-                <div style="padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 10px;">
-                    <div style="color: #888; font-size: 0.8rem;">SCENARIO ANALYSIS</div>
-                    <div style="font-size: 0.9rem; margin-top: 5px;">
-                        <span style="color: #00FF88;">🚀 Best: ${res['scenarios']['best']:,.0f}</span><br>
-                        <span style="color: #E0E0E0;">🎯 Likely: ${res['scenarios']['likely']:,.0f}</span><br>
-                        <span style="color: #FF3B69;">⚠️ Worst: ${res['scenarios']['worst']:,.0f}</span>
+                <div style="padding: 20px; background: rgba(255, 255, 255, 0.02); border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.08);">
+                    <div style="color: #8899A6; font-size: 0.85rem; font-family: 'Orbitron', sans-serif; letter-spacing: 1px;">SCENARIO ANALYSIS</div>
+                    <div style="font-size: 0.95rem; margin-top: 12px; font-family: 'Rajdhani', sans-serif; font-weight: 500;">
+                        <div style="margin-bottom: 6px;"><span style="color: var(--success-color);">🚀 BULL:</span> <span style="font-family: 'JetBrains Mono';">${res['scenarios']['best']:,.0f}</span></div>
+                        <div style="margin-bottom: 6px;"><span style="color: #8899A6;">🎯 BASE:</span> <span style="font-family: 'JetBrains Mono'; color: #FFF;">${res['scenarios']['likely']:,.0f}</span></div>
+                        <div><span style="color: var(--danger-color);">⚠️ BEAR:</span> <span style="font-family: 'JetBrains Mono';">${res['scenarios']['worst']:,.0f}</span></div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -2067,30 +2156,31 @@ def main():
             
             with comp_col1:
                 st.markdown(f"""
-                <div style="padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 10px; border-left: 4px solid #00D9FF;">
-                    <div style="color: #888; font-size: 0.8rem;">V1 PREDICTION (4 Features)</div>
-                    <div style="font-size: 1.5rem; font-weight: bold; color: #00D9FF;">${comp['v1']['price']:,.2f}</div>
-                    <div style="color: #888; font-size: 0.8rem; margin-top: 5px;">Confidence: {comp['v1']['confidence']:.1f}%</div>
+                <div style="padding: 20px; background: rgba(0, 217, 255, 0.05); border-radius: 16px; border: 1px solid rgba(0, 217, 255, 0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                    <div style="color: #8899A6; font-size: 0.8rem; font-family: 'Orbitron', sans-serif; letter-spacing: 1px;">V1 PREDICTION (4 Features)</div>
+                    <div style="font-size: clamp(1.5rem, 2vw, 1.8rem); font-weight: bold; color: var(--primary-color); font-family: 'JetBrains Mono', monospace; margin: 8px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${comp['v1']['price']:,.2f}</div>
+                    <div style="color: #8899A6; font-size: 0.8rem;">Confidence: <span style="color: #FFF; font-weight: bold;">{comp['v1']['confidence']:.1f}%</span></div>
                 </div>
                 """, unsafe_allow_html=True)
             
             with comp_col2:
                 st.markdown(f"""
-                <div style="padding: 15px; background: rgba(189, 0, 255, 0.1); border-radius: 10px; border-left: 4px solid #BD00FF;">
-                    <div style="color: #888; font-size: 0.8rem;">V2 PREDICTION (6 Features)</div>
-                    <div style="font-size: 1.5rem; font-weight: bold; color: #BD00FF;">${comp['v2']['price']:,.2f}</div>
-                    <div style="color: #888; font-size: 0.8rem; margin-top: 5px;">Confidence: {comp['v2']['confidence']:.1f}%</div>
+                <div style="padding: 20px; background: rgba(189, 0, 255, 0.05); border-radius: 16px; border: 1px solid rgba(189, 0, 255, 0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                    <div style="color: #8899A6; font-size: 0.8rem; font-family: 'Orbitron', sans-serif; letter-spacing: 1px;">V2 PREDICTION (Enhanced)</div>
+                    <div style="font-size: clamp(1.5rem, 2vw, 1.8rem); font-weight: bold; color: var(--secondary-color); font-family: 'JetBrains Mono', monospace; margin: 8px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${comp['v2']['price']:,.2f}</div>
+                    <div style="color: #8899A6; font-size: 0.8rem;">Confidence: <span style="color: #FFF; font-weight: bold;">{comp['v2']['confidence']:.1f}%</span></div>
                 </div>
                 """, unsafe_allow_html=True)
             
             with comp_col3:
-                diff_color = "#00FF88" if comp['difference']['price'] > 0 else "#FF3B69"
+                diff_color = "var(--success-color)" if comp['difference']['price'] > 0 else "var(--danger-color)"
+                diff_bg = "rgba(0, 255, 136, 0.1)" if comp['difference']['price'] > 0 else "rgba(255, 59, 105, 0.1)"
                 diff_icon = "⬆️" if comp['difference']['price'] > 0 else "⬇️"
                 st.markdown(f"""
-                <div style="padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 10px; border-left: 4px solid {diff_color};">
-                    <div style="color: #888; font-size: 0.8rem;">DIFFERENCE (V2 - V1)</div>
-                    <div style="font-size: 1.5rem; font-weight: bold; color: {diff_color};">${comp['difference']['price']:+,.2f} {diff_icon}</div>
-                    <div style="color: #888; font-size: 0.8rem; margin-top: 5px;">
+                <div style="padding: 20px; background: {diff_bg}; border-radius: 16px; border: 1px solid {diff_color}; box-shadow: 0 0 20px {diff_bg};">
+                    <div style="color: #8899A6; font-size: 0.8rem; font-family: 'Orbitron', sans-serif; letter-spacing: 1px;">DIFFERENCE (V2 - V1)</div>
+                    <div style="font-size: clamp(1.5rem, 2vw, 1.8rem); font-weight: bold; color: {diff_color}; font-family: 'JetBrains Mono', monospace; margin: 8px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${comp['difference']['price']:+,.2f} {diff_icon}</div>
+                    <div style="color: #FFF; font-size: 0.8rem; font-family: 'Rajdhani', sans-serif;">
                         {comp['difference']['price_pct']:+.2f}% | Conf: {comp['difference']['confidence']:+.1f}%
                     </div>
                 </div>
@@ -2146,12 +2236,12 @@ def main():
             if bt_results.get('v1'):
                 v1 = bt_results['v1']
                 st.markdown(f"""
-                <div style="padding: 15px; background: rgba(0, 217, 255, 0.1); border-radius: 10px; border-left: 4px solid #00D9FF;">
-                    <div style="color: #888; font-size: 0.8rem;">V1 BACKTEST</div>
-                    <div style="font-size: 1.2rem; font-weight: bold; color: #00D9FF;">Directional: {v1['directional_accuracy']:.1f}%</div>
-                    <div style="color: #888; font-size: 0.75rem; margin-top: 5px;">
-                        MAE: ${v1['mae']:.2f}<br>
-                        RMSE: ${v1['rmse']:.2f}<br>
+                <div style="padding: 20px; background: rgba(0, 217, 255, 0.05); border-radius: 16px; border: 1px solid rgba(0, 217, 255, 0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                    <div style="color: #8899A6; font-size: 0.8rem; font-family: 'Orbitron', sans-serif; letter-spacing: 1px;">V1 BACKTEST</div>
+                    <div style="font-size: 1.8rem; font-weight: bold; color: var(--primary-color); font-family: 'JetBrains Mono', monospace; margin: 8px 0;">Directional: {v1['directional_accuracy']:.1f}%</div>
+                    <div style="color: #8899A6; font-size: 0.75rem; font-family: 'Rajdhani', sans-serif;">
+                        MAE: <span style="color: #FFF;">${v1['mae']:.2f}</span><br>
+                        RMSE: <span style="color: #FFF;">${v1['rmse']:.2f}</span><br>
                         Predictions: {v1['total_predictions']}
                     </div>
                 </div>
@@ -2161,12 +2251,12 @@ def main():
             if bt_results.get('v2'):
                 v2 = bt_results['v2']
                 st.markdown(f"""
-                <div style="padding: 15px; background: rgba(189, 0, 255, 0.1); border-radius: 10px; border-left: 4px solid #BD00FF;">
-                    <div style="color: #888; font-size: 0.8rem;">V2 BACKTEST</div>
-                    <div style="font-size: 1.2rem; font-weight: bold; color: #BD00FF;">Directional: {v2['directional_accuracy']:.1f}%</div>
-                    <div style="color: #888; font-size: 0.75rem; margin-top: 5px;">
-                        MAE: ${v2['mae']:.2f}<br>
-                        RMSE: ${v2['rmse']:.2f}<br>
+                <div style="padding: 20px; background: rgba(189, 0, 255, 0.05); border-radius: 16px; border: 1px solid rgba(189, 0, 255, 0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                    <div style="color: #8899A6; font-size: 0.8rem; font-family: 'Orbitron', sans-serif; letter-spacing: 1px;">V2 BACKTEST</div>
+                    <div style="font-size: 1.8rem; font-weight: bold; color: var(--secondary-color); font-family: 'JetBrains Mono', monospace; margin: 8px 0;">Directional: {v2['directional_accuracy']:.1f}%</div>
+                    <div style="color: #8899A6; font-size: 0.75rem; font-family: 'Rajdhani', sans-serif;">
+                        MAE: <span style="color: #FFF;">${v2['mae']:.2f}</span><br>
+                        RMSE: <span style="color: #FFF;">${v2['rmse']:.2f}</span><br>
                         Predictions: {v2['total_predictions']}
                     </div>
                 </div>
@@ -2177,13 +2267,14 @@ def main():
                 v1, v2 = bt_results['v1'], bt_results['v2']
                 dir_diff = v2['directional_accuracy'] - v1['directional_accuracy']
                 mae_diff = v2['mae'] - v1['mae']
-                diff_color = "#00FF88" if dir_diff > 0 else "#FF3B69"
+                diff_color = "var(--success-color)" if dir_diff > 0 else "var(--danger-color)"
+                diff_bg = "rgba(0, 255, 136, 0.1)" if dir_diff > 0 else "rgba(255, 59, 105, 0.1)"
                 
                 st.markdown(f"""
-                <div style="padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 10px; border-left: 4px solid {diff_color};">
-                    <div style="color: #888; font-size: 0.8rem;">V2 vs V1</div>
-                    <div style="font-size: 1.2rem; font-weight: bold; color: {diff_color};">Dir: {dir_diff:+.1f}%</div>
-                    <div style="color: #888; font-size: 0.75rem; margin-top: 5px;">
+                <div style="padding: 20px; background: {diff_bg}; border-radius: 16px; border: 1px solid {diff_color}; box-shadow: 0 0 20px {diff_bg};">
+                    <div style="color: #8899A6; font-size: 0.8rem; font-family: 'Orbitron', sans-serif; letter-spacing: 1px;">V2 vs V1</div>
+                    <div style="font-size: 1.8rem; font-weight: bold; color: {diff_color}; font-family: 'JetBrains Mono', monospace; margin: 8px 0;">Dir: {dir_diff:+.1f}%</div>
+                    <div style="color: #FFF; font-size: 0.75rem; font-family: 'Rajdhani', sans-serif;">
                         MAE: ${mae_diff:+.2f}<br>
                         {'✅ V2 Better' if dir_diff > 0 else '⚠️ V1 Better'}
                     </div>
