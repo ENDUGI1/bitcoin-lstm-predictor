@@ -238,6 +238,93 @@ def save_tracker_data(tracker_data):
         logger.error(f"Error saving tracker data: {str(e)}")
         return False
 
+# ==================== ACCURACY METRICS CALCULATION ====================
+def calculate_accuracy_metrics(predictions_list):
+    """
+    Calculate MAE, RMSE, and directional accuracy from prediction history.
+    Returns dict with metrics or None if insufficient data.
+    """
+    if not predictions_list or len(predictions_list) < 2:
+        return None
+    
+    # Filter predictions that have actual prices
+    valid_predictions = [p for p in predictions_list if p.get('actual_price') is not None]
+    
+    if len(valid_predictions) < 2:
+        return None
+    
+    predicted_prices = [p['predicted_price'] for p in valid_predictions]
+    actual_prices = [p['actual_price'] for p in valid_predictions]
+    
+    # Calculate MAE (Mean Absolute Error)
+    errors = [abs(pred - actual) for pred, actual in zip(predicted_prices, actual_prices)]
+    mae = np.mean(errors)
+    
+    # Calculate RMSE (Root Mean Square Error)
+    squared_errors = [(pred - actual) ** 2 for pred, actual in zip(predicted_prices, actual_prices)]
+    rmse = np.sqrt(np.mean(squared_errors))
+    
+    # Calculate Directional Accuracy
+    correct_directions = 0
+    for p in valid_predictions:
+        predicted_direction = p.get('direction', 'unknown')
+        current_price = p.get('current_price', 0)
+        actual_price = p.get('actual_price', 0)
+        actual_direction = 'up' if actual_price > current_price else 'down'
+        
+        if predicted_direction == actual_direction:
+            correct_directions += 1
+    
+    directional_accuracy = (correct_directions / len(valid_predictions)) * 100
+    
+    return {
+        'mae': mae,
+        'rmse': rmse,
+        'directional_accuracy': directional_accuracy,
+        'total_predictions': len(valid_predictions)
+    }
+
+
+def create_confidence_gauge(confidence, title="Confidence"):
+    """
+    Create a Plotly gauge chart for confidence visualization.
+    """
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=confidence,
+        domain={'x': [0, 1], 'y': [0, 1]},
+        title={'text': title, 'font': {'size': 16, 'color': '#E0E0E0'}},
+        number={'suffix': "%", 'font': {'size': 32, 'color': '#FFF'}},
+        gauge={
+            'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "#888"},
+            'bar': {'color': "#00D9FF"},
+            'bgcolor': "rgba(0,0,0,0)",
+            'borderwidth': 2,
+            'bordercolor': "#333",
+            'steps': [
+                {'range': [0, 55], 'color': 'rgba(255, 59, 105, 0.3)'},  # Red - Low
+                {'range': [55, 70], 'color': 'rgba(255, 153, 0, 0.3)'},  # Orange - Medium
+                {'range': [70, 100], 'color': 'rgba(0, 255, 136, 0.3)'}  # Green - High
+            ],
+            'threshold': {
+                'line': {'color': "#BD00FF", 'width': 4},
+                'thickness': 0.75,
+                'value': confidence
+            }
+        }
+    ))
+    
+    fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font={'color': "#E0E0E0"},
+        height=250,
+        margin=dict(l=20, r=20, t=50, b=20)
+    )
+    
+    return fig
+
+
 # ==================== MODEL V2 DOWNLOAD FROM GITHUB RELEASES ====================
 def download_model_v2_files():
     """
@@ -636,17 +723,33 @@ def predict_next_price_v2(df_model, model, scaler, sequence_length=config.SEQUEN
     
     logger.info(f"V2 Raw prediction: ${predicted_price:,.2f}")
     
-    # Confidence Calculation (same as V1)
+    # Confidence Calculation (V2 Enhanced - uses ATR!)
     recent_prices = df_model['Close'].iloc[-10:].values
     price_changes = np.diff(recent_prices)
     volatility = np.std(price_changes)
     trend_consistency = np.abs(np.sum(np.sign(price_changes))) / len(price_changes)
     
+    # V2 ENHANCEMENT: Use ATR for more accurate volatility measurement
+    current_price = df_model['Close'].iloc[-1]
+    current_atr = df_model['ATR_14'].iloc[-1]
+    
+    # Normalize ATR relative to price (ATR as % of price)
+    atr_normalized = current_atr / current_price
+    atr_factor = min(atr_normalized * 100, 1.0)  # Cap at 1.0
+    
+    # Calculate base factors
     volatility_factor = min(volatility / np.mean(recent_prices) * 100, 1.0)
-    confidence = config.CONFIDENCE_BASE + (trend_consistency * config.CONFIDENCE_TREND_WEIGHT) - (volatility_factor * config.CONFIDENCE_VOLATILITY_WEIGHT)
+    
+    # V2 Formula: Base + Trend Bonus - Volatility Penalty - ATR Penalty
+    confidence = (config.CONFIDENCE_BASE + 
+                  (trend_consistency * config.CONFIDENCE_TREND_WEIGHT) - 
+                  (volatility_factor * config.CONFIDENCE_VOLATILITY_WEIGHT) -
+                  (atr_factor * config.CONFIDENCE_ATR_WEIGHT))  # NEW: ATR penalty
+    
     confidence = max(config.CONFIDENCE_MIN, min(config.CONFIDENCE_MAX, confidence))
     
-    logger.info(f"V2 Confidence score: {confidence:.1f}% (volatility: {volatility:.2f}, trend: {trend_consistency:.2f})")
+    logger.info(f"V2 Confidence score: {confidence:.1f}% (volatility: {volatility:.2f}, trend: {trend_consistency:.2f}, ATR: {current_atr:.2f})")
+
     
     current_price = df_model['Close'].iloc[-1]
     avg_move = np.mean(np.abs(price_changes))
@@ -659,6 +762,50 @@ def predict_next_price_v2(df_model, model, scaler, sequence_length=config.SEQUEN
     
     logger.info(f"V2 Prediction complete: ${predicted_price:,.2f} (Confidence: {confidence:.1f}%)")
     return predicted_price, confidence, scenarios
+
+
+# ==================== COMPARISON PREDICTION (V1 vs V2) ====================
+def run_comparison_prediction(df_v1, df_v2, sequence_length=config.SEQUENCE_LENGTH):
+    """
+    Run both V1 and V2 models simultaneously for comparison.
+    Returns predictions, confidences, and scenarios for both models.
+    """
+    logger.info("Running comparison prediction (V1 vs V2)")
+    
+    # Run V1 prediction
+    pred_v1, conf_v1, scen_v1 = predict_next_price(df_v1, model, scaler, sequence_length)
+    
+    # Run V2 prediction (if available)
+    if model_v2 is not None and scaler_v2 is not None:
+        pred_v2, conf_v2, scen_v2 = predict_next_price_v2(df_v2, model_v2, scaler_v2, sequence_length)
+    else:
+        logger.warning("V2 model not available, using V1 for both")
+        pred_v2, conf_v2, scen_v2 = pred_v1, conf_v1, scen_v1
+    
+    # Calculate differences
+    price_diff = pred_v2 - pred_v1 if pred_v1 and pred_v2 else 0
+    conf_diff = conf_v2 - conf_v1 if conf_v1 and conf_v2 else 0
+    
+    comparison_results = {
+        'v1': {
+            'price': pred_v1,
+            'confidence': conf_v1,
+            'scenarios': scen_v1
+        },
+        'v2': {
+            'price': pred_v2,
+            'confidence': conf_v2,
+            'scenarios': scen_v2
+        },
+        'difference': {
+            'price': price_diff,
+            'confidence': conf_diff,
+            'price_pct': (price_diff / pred_v1 * 100) if pred_v1 else 0
+        }
+    }
+    
+    logger.info(f"Comparison complete: V1=${pred_v1:,.2f}, V2=${pred_v2:,.2f}, Diff=${price_diff:,.2f}")
+    return comparison_results
 
 
 # ==================== VISUALISASI PATTERN 60 CANDLE ====================
@@ -867,6 +1014,14 @@ def main():
         
         st.write("---")
         
+        # Comparison Mode Toggle (NEW!)
+        compare_mode = st.checkbox(
+            "🔬 Compare V1 vs V2",
+            value=False,
+            help="Run both models simultaneously and compare predictions side-by-side"
+        )
+        
+
         # Model Performance Tracker (Minimal Backtesting)
         st.subheader("📊 Model Performance")
         
@@ -878,30 +1033,53 @@ def main():
         
         # Calculate accuracy if we have data (V1 OR V2)
         if len(tracker['v1_predictions']) > 0 or len(tracker['v2_predictions']) > 0:
+            # Calculate enhanced metrics for V1
+            v1_metrics = calculate_accuracy_metrics(tracker['v1_predictions'])
+            v2_metrics = calculate_accuracy_metrics(tracker['v2_predictions'])
+            
+            # Basic accuracy (fallback if no actual prices yet)
             v1_accuracy = (tracker['v1_correct'] / len(tracker['v1_predictions'])) * 100 if len(tracker['v1_predictions']) > 0 else 0
             v2_accuracy = (tracker['v2_correct'] / len(tracker['v2_predictions'])) * 100 if len(tracker['v2_predictions']) > 0 else 0
             
-            # Display performance
+            # Display performance with enhanced metrics
             perf_col1, perf_col2 = st.columns(2)
-            with perf_col1:
-                st.metric(
-                    "V1 Accuracy",
-                    f"{v1_accuracy:.1f}%",
-                    help=f"Based on {len(tracker['v1_predictions'])} predictions"
-                )
-            with perf_col2:
-                if len(tracker['v2_predictions']) > 0:
-                    delta_acc = v2_accuracy - v1_accuracy
-                    st.metric(
-                        "V2 Accuracy",
-                        f"{v2_accuracy:.1f}%",
-                        f"{delta_acc:+.1f}%",
-                        help=f"Based on {len(tracker['v2_predictions'])} predictions"
-                    )
-                else:
-                    st.metric("V2 Accuracy", "N/A", help="No V2 predictions yet")
             
-            st.caption(f"📈 Tracked: {len(tracker['v1_predictions'])} predictions")
+            with perf_col1:
+                st.markdown("**V1 (4 Features)**")
+                if v1_metrics:
+                    st.metric("Directional", f"{v1_metrics['directional_accuracy']:.1f}%")
+                    st.caption(f"MAE: ${v1_metrics['mae']:.2f}")
+                    st.caption(f"RMSE: ${v1_metrics['rmse']:.2f}")
+                    st.caption(f"📊 {v1_metrics['total_predictions']} verified")
+                else:
+                    st.metric("Accuracy", f"{v1_accuracy:.1f}%")
+                    st.caption(f"📈 {len(tracker['v1_predictions'])} predictions")
+                    st.caption("⏳ Awaiting actual prices")
+            
+            with perf_col2:
+                st.markdown("**V2 (6 Features)**")
+                if v2_metrics and len(tracker['v2_predictions']) > 0:
+                    # Calculate delta
+                    delta_dir = v2_metrics['directional_accuracy'] - (v1_metrics['directional_accuracy'] if v1_metrics else 0)
+                    st.metric("Directional", f"{v2_metrics['directional_accuracy']:.1f}%", f"{delta_dir:+.1f}%")
+                    
+                    # MAE comparison
+                    mae_better = v2_metrics['mae'] < v1_metrics['mae'] if v1_metrics else False
+                    st.caption(f"MAE: ${v2_metrics['mae']:.2f} {'⬇️' if mae_better else ''}")
+                    
+                    # RMSE comparison
+                    rmse_better = v2_metrics['rmse'] < v1_metrics['rmse'] if v1_metrics else False
+                    st.caption(f"RMSE: ${v2_metrics['rmse']:.2f} {'⬇️' if rmse_better else ''}")
+                    
+                    st.caption(f"📊 {v2_metrics['total_predictions']} verified")
+                elif len(tracker['v2_predictions']) > 0:
+                    st.metric("Accuracy", f"{v2_accuracy:.1f}%")
+                    st.caption(f"📈 {len(tracker['v2_predictions'])} predictions")
+                    st.caption("⏳ Awaiting actual prices")
+                else:
+                    st.metric("Accuracy", "N/A")
+                    st.caption("No V2 predictions yet")
+
             
             # Reset button
             if st.button("🔄 Reset Tracker", use_container_width=True):
@@ -1188,62 +1366,75 @@ def main():
             else:
                 # Data valid, proceed with prediction
                 try:
-                    with st.spinner(f"⚡ Running LSTM {model_version} Inference..."):
-                        pred_price, conf, scenarios = predict_func(df_model, model_active, scaler_active)
-                        
-                        if pred_price:
-                            diff = pred_price - current_price
-                            pct_diff = (diff / current_price) * 100
+                    # Check if comparison mode is enabled
+                    if compare_mode:
+                        # COMPARISON MODE: Run both V1 and V2
+                        with st.spinner("⚡ Running BOTH V1 and V2 models for comparison..."):
+                            comparison_results = run_comparison_prediction(df_model_v1, df_model_v2)
                             
-                            st.session_state['last_pred'] = {
-                                'price': pred_price, 'conf': conf, 'scenarios': scenarios,
-                                'diff': diff, 'pct': pct_diff
-                            }
-                            st.success("✅ Prediksi berhasil!")
-                            
-                            # Track prediction for performance monitoring
-                            tracker = st.session_state.get('performance_tracker', {
-                                'v1_predictions': [],
-                                'v2_predictions': [],
-                                'v1_correct': 0,
-                                'v2_correct': 0,
-                                'last_actual_price': None
-                            })
-                            
-                            # Store prediction with metadata
-                            prediction_record = {
-                                'timestamp': datetime.now(),
-                                'predicted_price': pred_price,
-                                'current_price': current_price,
-                                'model_version': model_version,
-                                'direction': 'up' if diff > 0 else 'down'
-                            }
-                            
-                            if model_version == "V1 (4 Features)":
-                                tracker['v1_predictions'].append(prediction_record)
+                            if comparison_results:
+                                st.session_state['comparison_results'] = comparison_results
+                                st.success("✅ Comparison complete! Both models ran successfully.")
                             else:
-                                tracker['v2_predictions'].append(prediction_record)
+                                st.error("❌ Comparison failed. Please try again.")
+                    else:
+                        # NORMAL MODE: Run selected model only
+                        with st.spinner(f"⚡ Running LSTM {model_version} Inference..."):
+                            pred_price, conf, scenarios = predict_func(df_model, model_active, scaler_active)
                             
-                            # Update tracker in session state
-                            st.session_state['performance_tracker'] = tracker
-                            
-                            # Save to persistent storage
-                            save_tracker_data(tracker)
-                            
-                            logger.info(f"Prediction tracked: {model_version} - ${pred_price:,.2f}")
-                            logger.info(f"Tracker state: V1={len(tracker['v1_predictions'])}, V2={len(tracker['v2_predictions'])}")
-                            
-                            # Send Telegram alert for prediction (if enabled)
-                            if st.session_state.get('alert_settings', {}).get('prediction', False):
-                                bot_token = st.session_state.get('telegram_bot_token', '')
-                                chat_id = st.session_state.get('telegram_chat_id', '')
+                            if pred_price:
+                                diff = pred_price - current_price
+                                pct_diff = (diff / current_price) * 100
                                 
-                                if bot_token and chat_id:
-                                    direction = "NAIK 📈" if diff > 0 else "TURUN 📉"
-                                    conf_level = "TINGGI" if conf >= 70 else "SEDANG" if conf >= 55 else "RENDAH"
-                                    pred_time = (datetime.now() + timedelta(minutes=15)).strftime('%H:%M')
+                                st.session_state['last_pred'] = {
+                                    'price': pred_price, 'conf': conf, 'scenarios': scenarios,
+                                    'diff': diff, 'pct': pct_diff
+                                }
+                                st.success("✅ Prediksi berhasil!")
+                                
+                                # Track prediction for performance monitoring
+                                tracker = st.session_state.get('performance_tracker', {
+                                    'v1_predictions': [],
+                                    'v2_predictions': [],
+                                    'v1_correct': 0,
+                                    'v2_correct': 0,
+                                    'last_actual_price': None
+                                })
+                                
+                                # Store prediction with metadata
+                                prediction_record = {
+                                    'timestamp': datetime.now(),
+                                    'predicted_price': pred_price,
+                                    'current_price': current_price,
+                                    'model_version': model_version,
+                                    'direction': 'up' if diff > 0 else 'down'
+                                }
+                                
+                                if model_version == "V1 (4 Features)":
+                                    tracker['v1_predictions'].append(prediction_record)
+                                else:
+                                    tracker['v2_predictions'].append(prediction_record)
+                                
+                                # Update tracker in session state
+                                st.session_state['performance_tracker'] = tracker
+                                
+                                # Save to persistent storage
+                                save_tracker_data(tracker)
+                                
+                                logger.info(f"Prediction tracked: {model_version} - ${pred_price:,.2f}")
+                                logger.info(f"Tracker state: V1={len(tracker['v1_predictions'])}, V2={len(tracker['v2_predictions'])}")
+                                
+                                # Send Telegram alert for prediction (if enabled)
+                                if st.session_state.get('alert_settings', {}).get('prediction', False):
+                                    bot_token = st.session_state.get('telegram_bot_token', '')
+                                    chat_id = st.session_state.get('telegram_chat_id', '')
                                     
-                                    pred_msg = f"""
+                                    if bot_token and chat_id:
+                                        direction = "NAIK 📈" if diff > 0 else "TURUN 📉"
+                                        conf_level = "TINGGI" if conf >= 70 else "SEDANG" if conf >= 55 else "RENDAH"
+                                        pred_time = (datetime.now() + timedelta(minutes=15)).strftime('%H:%M')
+                                        
+                                        pred_msg = f"""
 🎯 <b>LSTM PREDICTION ALERT</b>
 
 💰 Current Price: ${current_price:,.2f}
@@ -1263,9 +1454,9 @@ def main():
 
 ⚠️ Disclaimer: For reference only, not financial advice.
 """
-                                    send_telegram_message(bot_token, chat_id, pred_msg)
-                        else:
-                            st.error("❌ Model gagal menghasilkan prediksi. Silakan coba lagi.")
+                                        send_telegram_message(bot_token, chat_id, pred_msg)
+                            else:
+                                st.error("❌ Model gagal menghasilkan prediksi. Silakan coba lagi.")
                             
                 except Exception as e:
                     st.error(f"❌ **Error saat prediksi:** {str(e)}")
@@ -1296,11 +1487,13 @@ def main():
                 """, unsafe_allow_html=True)
             
             with pc2:
-                 st.markdown(f"""
+                # Dynamic subtitle based on model version
+                conf_subtitle = "Based on ATR + Volatility" if model_version == "V2 (6 Features - Enhanced)" else "Based on Sequence Stability"
+                st.markdown(f"""
                 <div style="padding: 15px; background: rgba(189, 0, 255, 0.1); border-radius: 10px; border-left: 4px solid #BD00FF;">
                     <div style="color: #888; font-size: 0.8rem;">MODEL CONFIDENCE</div>
                     <div style="font-size: 1.8rem; font-weight: bold; color: #FFF;">{res['conf']:.1f}%</div>
-                    <div style="color: #BD00FF; font-size: 0.8rem;">Based on Sequence Stability</div>
+                    <div style="color: #BD00FF; font-size: 0.8rem;">{conf_subtitle}</div>
                 </div>
                 """, unsafe_allow_html=True)
                  
@@ -1316,7 +1509,41 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
 
+            # Confidence Gauge Visualization (NEW!)
+            st.markdown("---")
+            st.markdown("#### 📊 Confidence Visualization")
             
+            gauge_col1, gauge_col2 = st.columns([1, 2])
+            
+            with gauge_col1:
+                # Confidence gauge chart
+                gauge_fig = create_confidence_gauge(res['conf'], "Model Confidence")
+                st.plotly_chart(gauge_fig, use_container_width=True)
+            
+            with gauge_col2:
+                # Confidence breakdown
+                st.markdown("**Confidence Breakdown:**")
+                st.markdown(f"""
+                - **Base Score:** 50%
+                - **Trend Consistency:** Contributes up to +30%
+                - **Volatility Penalty:** Up to -20%
+                """)
+                
+                if model_version == "V2 (6 Features - Enhanced)":
+                    st.markdown("- **ATR Penalty (V2 only):** Up to -15% ⚡")
+                    st.caption("✨ V2 uses ATR for more accurate volatility assessment")
+                else:
+                    st.caption("💡 V1 uses basic volatility calculation")
+                
+                # Confidence level indicator
+                if res['conf'] >= 70:
+                    st.success("🟢 **HIGH CONFIDENCE** - Strong signal")
+                elif res['conf'] >= 55:
+                    st.warning("🟡 **MEDIUM CONFIDENCE** - Moderate signal")
+                else:
+                    st.error("🔴 **LOW CONFIDENCE** - Weak signal, use caution")
+            
+
             # --- Interpretation & Disclaimer ---
             st.markdown("---")
             
@@ -1387,6 +1614,57 @@ def main():
                 mime="text/csv",
                 use_container_width=True
             )
+        
+        # COMPARISON RESULTS DISPLAY (NEW!)
+        if 'comparison_results' in st.session_state:
+            comp = st.session_state['comparison_results']
+            
+            st.markdown("---")
+            st.markdown("### 🔬 Model Comparison Results")
+            st.caption("Side-by-side comparison of V1 (4 features) vs V2 (6 features) predictions")
+            
+            # Comparison Cards
+            comp_col1, comp_col2, comp_col3 = st.columns(3)
+            
+            with comp_col1:
+                st.markdown(f"""
+                <div style="padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 10px; border-left: 4px solid #00D9FF;">
+                    <div style="color: #888; font-size: 0.8rem;">V1 PREDICTION (4 Features)</div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #00D9FF;">${comp['v1']['price']:,.2f}</div>
+                    <div style="color: #888; font-size: 0.8rem; margin-top: 5px;">Confidence: {comp['v1']['confidence']:.1f}%</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with comp_col2:
+                st.markdown(f"""
+                <div style="padding: 15px; background: rgba(189, 0, 255, 0.1); border-radius: 10px; border-left: 4px solid #BD00FF;">
+                    <div style="color: #888; font-size: 0.8rem;">V2 PREDICTION (6 Features)</div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #BD00FF;">${comp['v2']['price']:,.2f}</div>
+                    <div style="color: #888; font-size: 0.8rem; margin-top: 5px;">Confidence: {comp['v2']['confidence']:.1f}%</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with comp_col3:
+                diff_color = "#00FF88" if comp['difference']['price'] > 0 else "#FF3B69"
+                diff_icon = "⬆️" if comp['difference']['price'] > 0 else "⬇️"
+                st.markdown(f"""
+                <div style="padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 10px; border-left: 4px solid {diff_color};">
+                    <div style="color: #888; font-size: 0.8rem;">DIFFERENCE (V2 - V1)</div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: {diff_color};">${comp['difference']['price']:+,.2f} {diff_icon}</div>
+                    <div style="color: #888; font-size: 0.8rem; margin-top: 5px;">
+                        {comp['difference']['price_pct']:+.2f}% | Conf: {comp['difference']['confidence']:+.1f}%
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Comparison Insights
+            st.markdown("---")
+            st.info(f"""
+            **💡 Comparison Insights:**  
+            - V2 predicts **${abs(comp['difference']['price']):,.2f} {'higher' if comp['difference']['price'] > 0 else 'lower'}** than V1
+            - V2 confidence is **{abs(comp['difference']['confidence']):.1f}% {'higher' if comp['difference']['confidence'] > 0 else 'lower'}** than V1
+            - V2 uses additional features (ATR + Log Volume) for more sophisticated analysis
+            """)
 
     # Footer
     st.markdown("---")

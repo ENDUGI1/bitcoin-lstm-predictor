@@ -64,12 +64,15 @@ COLOR_DANGER = "#FF3B69"  # Red
 COLOR_WARNING = "#FF9900"  # Orange
 
 # ==================== CONFIDENCE SCORING ====================
-# Confidence Calculation Parameters
+# Confidence Calculation Parameters (V1)
 CONFIDENCE_BASE = 50  # Base confidence score
 CONFIDENCE_TREND_WEIGHT = 30  # Weight for trend consistency
 CONFIDENCE_VOLATILITY_WEIGHT = 20  # Weight for volatility penalty
 CONFIDENCE_MIN = 40  # Minimum confidence score
 CONFIDENCE_MAX = 90  # Maximum confidence score
+
+# V2 Enhanced Confidence (uses ATR)
+CONFIDENCE_ATR_WEIGHT = 15  # Weight for ATR-based volatility (V2 only)
 
 # Confidence Thresholds
 CONFIDENCE_HIGH_THRESHOLD = 70  # High confidence threshold
