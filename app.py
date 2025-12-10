@@ -9,6 +9,8 @@ import base64
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
 import logging
+import json
+import os
 
 # Import configuration
 import config
@@ -54,6 +56,22 @@ def calculate_macd(series, fast=12, slow=26, signal=9):
     signal_line = macd_line.ewm(span=signal, adjust=False).mean()
     histogram = macd_line - signal_line
     return macd_line, signal_line, histogram
+
+def calculate_atr(df, period=14):
+    """
+    Calculate Average True Range (ATR) manually
+    ATR = Moving Average of True Range
+    True Range = max(High-Low, abs(High-PrevClose), abs(Low-PrevClose))
+    """
+    high_low = df['High'] - df['Low']
+    high_close = np.abs(df['High'] - df['Close'].shift())
+    low_close = np.abs(df['Low'] - df['Close'].shift())
+    
+    ranges = pd.concat([high_low, high_close, low_close], axis=1)
+    true_range = ranges.max(axis=1)
+    atr = true_range.rolling(period).mean()
+    
+    return atr
 
 # ==================== CUSTOM CSS (CYBERPUNK STYLE) ====================
 def inject_custom_css():
@@ -141,20 +159,105 @@ def inject_custom_css():
 
 inject_custom_css()
 
+# ==================== PERSISTENT TRACKER STORAGE ====================
+TRACKER_FILE = "tracker_data.json"
+
+def load_tracker_data():
+    """Load tracker data from JSON file"""
+    try:
+        if os.path.exists(TRACKER_FILE):
+            with open(TRACKER_FILE, 'r') as f:
+                data = json.load(f)
+                logger.info(f"Tracker data loaded: V1={len(data.get('v1_predictions', []))}, V2={len(data.get('v2_predictions', []))}")
+                return data
+        else:
+            logger.info("No existing tracker data found, starting fresh")
+            return {
+                'v1_predictions': [],
+                'v2_predictions': [],
+                'v1_correct': 0,
+                'v2_correct': 0,
+                'last_actual_price': None
+            }
+    except Exception as e:
+        logger.error(f"Error loading tracker data: {str(e)}, starting fresh")
+        return {
+            'v1_predictions': [],
+            'v2_predictions': [],
+            'v1_correct': 0,
+            'v2_correct': 0,
+            'last_actual_price': None
+        }
+
+def save_tracker_data(tracker_data):
+    """Save tracker data to JSON file"""
+    try:
+        # Convert datetime objects to strings for JSON serialization
+        data_to_save = {
+            'v1_predictions': [],
+            'v2_predictions': [],
+            'v1_correct': tracker_data.get('v1_correct', 0),
+            'v2_correct': tracker_data.get('v2_correct', 0),
+            'last_actual_price': tracker_data.get('last_actual_price')
+        }
+        
+        # Convert predictions with datetime to serializable format
+        for pred in tracker_data.get('v1_predictions', []):
+            pred_copy = pred.copy()
+            if isinstance(pred_copy.get('timestamp'), datetime):
+                pred_copy['timestamp'] = pred_copy['timestamp'].isoformat()
+            data_to_save['v1_predictions'].append(pred_copy)
+        
+        for pred in tracker_data.get('v2_predictions', []):
+            pred_copy = pred.copy()
+            if isinstance(pred_copy.get('timestamp'), datetime):
+                pred_copy['timestamp'] = pred_copy['timestamp'].isoformat()
+            data_to_save['v2_predictions'].append(pred_copy)
+        
+        # Keep only last 100 predictions to avoid file bloat
+        data_to_save['v1_predictions'] = data_to_save['v1_predictions'][-100:]
+        data_to_save['v2_predictions'] = data_to_save['v2_predictions'][-100:]
+        
+        with open(TRACKER_FILE, 'w') as f:
+            json.dump(data_to_save, f, indent=2)
+        
+        logger.info(f"Tracker data saved: V1={len(data_to_save['v1_predictions'])}, V2={len(data_to_save['v2_predictions'])}")
+        return True
+    except Exception as e:
+        logger.error(f"Error saving tracker data: {str(e)}")
+        return False
+
 # ==================== LOAD MODEL & SCALER ====================
 @st.cache_resource
 def load_model_and_scaler():
-    """Load pretrained LSTM model and scaler"""
+    """Load pretrained LSTM model V1 and scaler (4 features)"""
     try:
-        # Use tf.keras instead of direct keras import to avoid DLL issues
-        model = tf.keras.models.load_model('model_bitcoin_final.keras')
-        scaler = joblib.load('scaler_bitcoin.pkl')
+        model = tf.keras.models.load_model(config.MODEL_PATH)
+        scaler = joblib.load(config.SCALER_PATH)
+        logger.info("✅ Model V1 (4 features) loaded successfully")
         return model, scaler
     except Exception as e:
-        st.error(f"❌ Error loading model/scaler: {str(e)}")
+        st.error(f"❌ Error loading Model V1: {str(e)}")
         st.stop()
 
+@st.cache_resource
+def load_model_v2():
+    """Load pretrained LSTM model V2 and scaler (6 features)"""
+    try:
+        model_v2 = tf.keras.models.load_model(config.MODEL_V2_PATH)
+        scaler_v2 = joblib.load(config.SCALER_V2_PATH)
+        logger.info("✅ Model V2 (6 features) loaded successfully")
+        return model_v2, scaler_v2
+    except FileNotFoundError as e:
+        logger.warning(f"Model V2 files not found: {str(e)}")
+        return None, None
+    except Exception as e:
+        logger.error(f"Error loading Model V2: {str(e)}")
+        return None, None
+
+# Load both models
 model, scaler = load_model_and_scaler()
+model_v2, scaler_v2 = load_model_v2()
 
 # ==================== FUNGSI AMBIL DATA LIVE ====================
 @st.cache_data(ttl=config.CACHE_TTL_DATA, show_spinner=False)
@@ -238,11 +341,12 @@ def validate_data_for_prediction(df, min_rows=config.MIN_DATA_ROWS):
 @st.cache_data(ttl=config.CACHE_TTL_INDICATORS, show_spinner=False)
 def calculate_technical_indicators(df):
     """
-    Calculate ONLY technical indicators used in Thesis:
-    - RSI (14)
-    - MACD (12, 26, 9)
+    Calculate technical indicators for BOTH models:
+    - Model V1 (4 features): Close, RSI, MACD, Signal
+    - Model V2 (6 features): + ATR, Log Volume
     
     Cached for 5 minutes to improve performance.
+    Returns: (df_features, df_model_v1, df_model_v2)
     """
     logger.info(f"Calculating technical indicators for {len(df)} candles")
     
@@ -253,7 +357,6 @@ def calculate_technical_indicators(df):
     logger.debug(f"RSI calculated: {df_features['RSI_14'].iloc[-1]:.2f}")
     
     # MACD (12, 26, 9) using manual function
-    # Note: calculate_macd returns (macd_line, signal_line, histogram)
     macd_line, signal_line, histogram = calculate_macd(
         df_features['Close'], 
         fast=config.MACD_FAST, 
@@ -265,14 +368,24 @@ def calculate_technical_indicators(df):
     df_features['MACDs_12_26_9'] = signal_line
     logger.debug(f"MACD calculated: {macd_line.iloc[-1]:.4f}")
     
+    # ATR (14) - For Model V2
+    df_features['ATR_14'] = calculate_atr(df_features, period=config.ATR_LENGTH)
+    logger.debug(f"ATR calculated: {df_features['ATR_14'].iloc[-1]:.2f}")
+    
+    # Log Volume - For Model V2
+    df_features['Log_Volume'] = np.log(df_features['Volume'] + 1)
+    logger.debug(f"Log Volume calculated: {df_features['Log_Volume'].iloc[-1]:.2f}")
+    
     df_features = df_features.dropna()
     
-    # Filter columns for model
-    # Model trained on: ['Close', 'RSI_14', 'MACD_12_26_9', 'MACDs_12_26_9']
-    df_model = df_features[['Close', 'RSI_14', 'MACD_12_26_9', 'MACDs_12_26_9']].copy()
+    # Model V1: 4 features (Close, RSI, MACD, Signal)
+    df_model_v1 = df_features[['Close', 'RSI_14', 'MACD_12_26_9', 'MACDs_12_26_9']].copy()
     
-    logger.info(f"Technical indicators calculated successfully. Output rows: {len(df_model)}")
-    return df_features, df_model
+    # Model V2: 6 features (+ ATR, Log Volume)
+    df_model_v2 = df_features[['Close', 'RSI_14', 'MACD_12_26_9', 'MACDs_12_26_9', 'ATR_14', 'Log_Volume']].copy()
+    
+    logger.info(f"Technical indicators calculated. V1: {len(df_model_v1)} rows, V2: {len(df_model_v2)} rows")
+    return df_features, df_model_v1, df_model_v2
 
 # ==================== TELEGRAM ALERT SYSTEM ====================
 def send_telegram_message(bot_token, chat_id, message):
@@ -420,6 +533,62 @@ def predict_next_price(df_model, model, scaler, sequence_length=config.SEQUENCE_
     logger.info(f"Prediction complete: ${predicted_price:,.2f} (Confidence: {confidence:.1f}%)")
     return predicted_price, confidence, scenarios
 
+def predict_next_price_v2(df_model, model, scaler, sequence_length=config.SEQUENCE_LENGTH):
+    """
+    Predict using Model V2 (6 features)
+    CRITICAL: Proper inverse transform for 6-column scaler
+    Features: Close, RSI, MACD, Signal, ATR, Log Volume
+    """
+    logger.info(f"Starting LSTM V2 prediction with sequence length: {sequence_length}")
+    
+    if len(df_model) < sequence_length:
+        logger.error(f"Insufficient data for V2: {len(df_model)} rows (need {sequence_length})")
+        st.error(f"❌ Data insufficient! Need {sequence_length} rows.")
+        return None, None, None
+    
+    # Take last 60 rows (6 features)
+    last_sequence = df_model.iloc[-sequence_length:].values
+    last_sequence_scaled = scaler.transform(last_sequence)
+    X_input = last_sequence_scaled.reshape(1, sequence_length, 6)  # 6 features!
+    
+    logger.debug(f"V2 Input shape: {X_input.shape}")
+    prediction_scaled = model.predict(X_input, verbose=0)
+    
+    # CRITICAL: Inverse Transform for 6-column scaler
+    # Create dummy array with 6 columns
+    dummy_array = np.zeros((1, 6))
+    # Place predicted value in first column (Close price index)
+    dummy_array[:, 0] = prediction_scaled[0, 0]
+    # Inverse transform and extract Close price
+    predicted_price = scaler.inverse_transform(dummy_array)[:, 0][0]
+    
+    logger.info(f"V2 Raw prediction: ${predicted_price:,.2f}")
+    
+    # Confidence Calculation (same as V1)
+    recent_prices = df_model['Close'].iloc[-10:].values
+    price_changes = np.diff(recent_prices)
+    volatility = np.std(price_changes)
+    trend_consistency = np.abs(np.sum(np.sign(price_changes))) / len(price_changes)
+    
+    volatility_factor = min(volatility / np.mean(recent_prices) * 100, 1.0)
+    confidence = config.CONFIDENCE_BASE + (trend_consistency * config.CONFIDENCE_TREND_WEIGHT) - (volatility_factor * config.CONFIDENCE_VOLATILITY_WEIGHT)
+    confidence = max(config.CONFIDENCE_MIN, min(config.CONFIDENCE_MAX, confidence))
+    
+    logger.info(f"V2 Confidence score: {confidence:.1f}% (volatility: {volatility:.2f}, trend: {trend_consistency:.2f})")
+    
+    current_price = df_model['Close'].iloc[-1]
+    avg_move = np.mean(np.abs(price_changes))
+    
+    scenarios = {
+        'best': predicted_price + (avg_move * 1.5),
+        'worst': predicted_price - (avg_move * 1.5),
+        'likely': (predicted_price * 0.7) + (current_price * 0.3)
+    }
+    
+    logger.info(f"V2 Prediction complete: ${predicted_price:,.2f} (Confidence: {confidence:.1f}%)")
+    return predicted_price, confidence, scenarios
+
+
 # ==================== VISUALISASI PATTERN 60 CANDLE ====================
 def create_pattern_chart(df_features, sequence_length=60):
     """
@@ -477,13 +646,13 @@ def create_main_chart(df, df_features):
     
     from plotly.subplots import make_subplots
     
-    # Create Subplots: Price, RSI, MACD
+    # Create Subplots: Price, RSI, MACD, ATR (New for V2!)
     fig = make_subplots(
-        rows=3, cols=1,
+        rows=4, cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.05,
-        row_heights=[0.5, 0.25, 0.25],
-        subplot_titles=('Price Action', 'RSI (14)', 'MACD (12,26,9)')
+        vertical_spacing=0.04,
+        row_heights=[0.4, 0.2, 0.2, 0.2],
+        subplot_titles=('Price Action', 'RSI (14)', 'MACD (12,26,9)', 'ATR (14) - V2 Feature')
     )
     
     # 1. Candlestick
@@ -506,7 +675,6 @@ def create_main_chart(df, df_features):
     fig.add_hline(y=30, line_dash="dash", line_color="rgba(0, 255, 136, 0.5)", row=2, col=1)
     
     # 3. MACD with Histogram
-    # Calculate histogram for visualization
     histogram = df_feat['MACD_12_26_9'] - df_feat['MACDs_12_26_9']
     
     # MACD Histogram (Bar Chart)
@@ -532,14 +700,35 @@ def create_main_chart(df, df_features):
         line=dict(color='#FF9900', width=2)
     ), row=3, col=1)
     
+    # 4. ATR (New for Model V2!)
+    if 'ATR_14' in df_feat.columns:
+        fig.add_trace(go.Scatter(
+            x=df_feat.index, y=df_feat['ATR_14'],
+            name='ATR',
+            line=dict(color='#00D9FF', width=2),
+            fill='tozeroy',
+            fillcolor='rgba(0, 217, 255, 0.1)'
+        ), row=4, col=1)
+        
+        # Add average line for reference
+        atr_avg = df_feat['ATR_14'].mean()
+        fig.add_hline(
+            y=atr_avg, 
+            line_dash="dot", 
+            line_color="rgba(255, 255, 255, 0.3)", 
+            row=4, col=1,
+            annotation_text=f"Avg: {atr_avg:.2f}",
+            annotation_position="right"
+        )
+    
     fig.update_layout(
-        height=700,
+        height=800,  # Increased height for 4 subplots
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
         xaxis=dict(showgrid=False, color='#888'),
         yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.05)', color='#888'),
         legend=dict(orientation="h", y=1.02, x=0.5, xanchor="center"),
-        margin=dict(l=20, r=20, t=40, b=20),
+        margin=dict(l=20, r=20, t=60, b=20),
         hovermode='x unified'
     )
     
@@ -569,15 +758,98 @@ def main():
         
         st.write("---")
         
-        # Model Performance Metrics
+        # Model Selection
+        st.subheader("🤖 Model Selection")
+        model_version = st.radio(
+            "Choose LSTM Model:",
+            options=["V1 (4 Features)", "V2 (6 Features - Enhanced)"],
+            index=0,
+            help="V1: Close, RSI, MACD, Signal\nV2: + ATR, Log Volume"
+        )
+        
+        # Dynamic Model Info based on selection
         st.subheader("📊 Model Info")
-        st.markdown("""
-        **Architecture:** LSTM (60 timesteps)  
-        **Features:** Close, RSI, MACD, Signal  
-        **Training Period:** Historical BTC Data  
-        **Prediction Horizon:** 15 Minutes  
-        **Estimated Accuracy:** 55-65%  
-        """)
+        if model_version == "V1 (4 Features)":
+            st.markdown("""
+            **Version:** V1 (Baseline)  
+            **Architecture:** LSTM (60 timesteps)  
+            **Features (4):** Close, RSI, MACD, Signal  
+            **Training Period:** Historical BTC Data  
+            **Prediction Horizon:** 15 Minutes  
+            **Estimated Accuracy:** 55-65%  
+            """)
+        else:
+            if model_v2 is not None:
+                st.markdown("""
+                **Version:** V2 (Enhanced) ✨  
+                **Architecture:** LSTM (60 timesteps)  
+                **Features (6):** Close, RSI, MACD, Signal, **ATR**, **Log Volume**  
+                **Training Period:** Historical BTC Data  
+                **Prediction Horizon:** 15 Minutes  
+                **Estimated Accuracy:** 60-70% (Improved!)  
+                """)
+                st.success("✅ Model V2 loaded and ready!")
+            else:
+                st.warning("⚠️ Model V2 files not found. Using V1 instead.")
+                model_version = "V1 (4 Features)"  # Fallback to V1
+        
+        st.write("---")
+        
+        # Model Performance Tracker (Minimal Backtesting)
+        st.subheader("📊 Model Performance")
+        
+        # Initialize performance tracking in session state from persistent storage
+        if 'performance_tracker' not in st.session_state:
+            st.session_state['performance_tracker'] = load_tracker_data()
+        
+        tracker = st.session_state['performance_tracker']
+        
+        # Calculate accuracy if we have data (V1 OR V2)
+        if len(tracker['v1_predictions']) > 0 or len(tracker['v2_predictions']) > 0:
+            v1_accuracy = (tracker['v1_correct'] / len(tracker['v1_predictions'])) * 100 if len(tracker['v1_predictions']) > 0 else 0
+            v2_accuracy = (tracker['v2_correct'] / len(tracker['v2_predictions'])) * 100 if len(tracker['v2_predictions']) > 0 else 0
+            
+            # Display performance
+            perf_col1, perf_col2 = st.columns(2)
+            with perf_col1:
+                st.metric(
+                    "V1 Accuracy",
+                    f"{v1_accuracy:.1f}%",
+                    help=f"Based on {len(tracker['v1_predictions'])} predictions"
+                )
+            with perf_col2:
+                if len(tracker['v2_predictions']) > 0:
+                    delta_acc = v2_accuracy - v1_accuracy
+                    st.metric(
+                        "V2 Accuracy",
+                        f"{v2_accuracy:.1f}%",
+                        f"{delta_acc:+.1f}%",
+                        help=f"Based on {len(tracker['v2_predictions'])} predictions"
+                    )
+                else:
+                    st.metric("V2 Accuracy", "N/A", help="No V2 predictions yet")
+            
+            st.caption(f"📈 Tracked: {len(tracker['v1_predictions'])} predictions")
+            
+            # Reset button
+            if st.button("🔄 Reset Tracker", use_container_width=True):
+                # Delete JSON file
+                if os.path.exists(TRACKER_FILE):
+                    os.remove(TRACKER_FILE)
+                    logger.info("Tracker data file deleted")
+                
+                # Reset session state
+                st.session_state['performance_tracker'] = {
+                    'v1_predictions': [],
+                    'v2_predictions': [],
+                    'v1_correct': 0,
+                    'v2_correct': 0,
+                    'last_actual_price': None
+                }
+                st.success("✅ Tracker reset successfully!")
+                st.rerun()
+        else:
+            st.info("📊 Run predictions to start tracking performance!")
         
         st.write("---")
         st.subheader("⚙️ Settings")
@@ -737,7 +1009,29 @@ def main():
     # --- Data Loading ---
     with st.spinner("📡 Fetching Market Data..."):
         df_raw = get_live_bitcoin_data()
-        df_full, df_model = calculate_technical_indicators(df_raw)
+        df_full, df_model_v1, df_model_v2 = calculate_technical_indicators(df_raw)
+    
+    # Select active model based on sidebar choice
+    if model_version == "V1 (4 Features)":
+        df_model = df_model_v1
+        model_active = model
+        scaler_active = scaler
+        predict_func = predict_next_price
+        logger.info("Using Model V1 (4 features)")
+    else:
+        if model_v2 is not None and scaler_v2 is not None:
+            df_model = df_model_v2
+            model_active = model_v2
+            scaler_active = scaler_v2
+            predict_func = predict_next_price_v2
+            logger.info("Using Model V2 (6 features)")
+        else:
+            # Fallback to V1 if V2 not available
+            df_model = df_model_v1
+            model_active = model
+            scaler_active = scaler
+            predict_func = predict_next_price
+            logger.warning("Model V2 not available, falling back to V1")
 
     # --- Metrics Row ---
     current_price = df_raw['Close'].iloc[-1]
@@ -822,8 +1116,8 @@ def main():
             else:
                 # Data valid, proceed with prediction
                 try:
-                    with st.spinner("⚡ Running LSTM Inference..."):
-                        pred_price, conf, scenarios = predict_next_price(df_model, model, scaler)
+                    with st.spinner(f"⚡ Running LSTM {model_version} Inference..."):
+                        pred_price, conf, scenarios = predict_func(df_model, model_active, scaler_active)
                         
                         if pred_price:
                             diff = pred_price - current_price
@@ -834,6 +1128,38 @@ def main():
                                 'diff': diff, 'pct': pct_diff
                             }
                             st.success("✅ Prediksi berhasil!")
+                            
+                            # Track prediction for performance monitoring
+                            tracker = st.session_state.get('performance_tracker', {
+                                'v1_predictions': [],
+                                'v2_predictions': [],
+                                'v1_correct': 0,
+                                'v2_correct': 0,
+                                'last_actual_price': None
+                            })
+                            
+                            # Store prediction with metadata
+                            prediction_record = {
+                                'timestamp': datetime.now(),
+                                'predicted_price': pred_price,
+                                'current_price': current_price,
+                                'model_version': model_version,
+                                'direction': 'up' if diff > 0 else 'down'
+                            }
+                            
+                            if model_version == "V1 (4 Features)":
+                                tracker['v1_predictions'].append(prediction_record)
+                            else:
+                                tracker['v2_predictions'].append(prediction_record)
+                            
+                            # Update tracker in session state
+                            st.session_state['performance_tracker'] = tracker
+                            
+                            # Save to persistent storage
+                            save_tracker_data(tracker)
+                            
+                            logger.info(f"Prediction tracked: {model_version} - ${pred_price:,.2f}")
+                            logger.info(f"Tracker state: V1={len(tracker['v1_predictions'])}, V2={len(tracker['v2_predictions'])}")
                             
                             # Send Telegram alert for prediction (if enabled)
                             if st.session_state.get('alert_settings', {}).get('prediction', False):

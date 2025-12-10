@@ -8,9 +8,15 @@
 SEQUENCE_LENGTH = 60  # Number of candles used for prediction
 PREDICTION_HORIZON_MINUTES = 15  # Prediction timeframe in minutes
 
-# Model Files
+# Model V1 Files (4 Features: Close, RSI, MACD, Signal)
 MODEL_PATH = "model_bitcoin_final.keras"
 SCALER_PATH = "scaler_bitcoin.pkl"
+MODEL_V1_FEATURES = 4
+
+# Model V2 Files (6 Features: + ATR, Log Volume)
+MODEL_V2_PATH = "model_bitcoin_v2_6features.keras"
+SCALER_V2_PATH = "scaler_bitcoin_v2.pkl"
+MODEL_V2_FEATURES = 6
 
 # ==================== TECHNICAL INDICATORS ====================
 # RSI Configuration
@@ -20,6 +26,9 @@ RSI_LENGTH = 14  # Standard RSI period
 MACD_FAST = 12   # Fast EMA period
 MACD_SLOW = 26   # Slow EMA period
 MACD_SIGNAL = 9  # Signal line period
+
+# ATR Configuration (for Model V2)
+ATR_LENGTH = 14  # Standard ATR period
 
 # ==================== DATA FETCHING ====================
 # Yahoo Finance Configuration
