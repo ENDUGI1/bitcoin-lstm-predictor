@@ -63,15 +63,26 @@ def calculate_atr(df, period=14):
     ATR = Moving Average of True Range
     True Range = max(High-Low, abs(High-PrevClose), abs(Low-PrevClose))
     """
-    high_low = df['High'] - df['Low']
-    high_close = np.abs(df['High'] - df['Close'].shift())
-    low_close = np.abs(df['Low'] - df['Close'].shift())
-    
-    ranges = pd.concat([high_low, high_close, low_close], axis=1)
-    true_range = ranges.max(axis=1)
-    atr = true_range.rolling(period).mean()
-    
-    return atr
+    try:
+        high_low = df['High'] - df['Low']
+        high_close = np.abs(df['High'] - df['Close'].shift())
+        low_close = np.abs(df['Low'] - df['Close'].shift())
+        
+        # Create DataFrame explicitly for better compatibility
+        ranges = pd.DataFrame({
+            'hl': high_low,
+            'hc': high_close,
+            'lc': low_close
+        })
+        
+        true_range = ranges.max(axis=1)
+        atr = true_range.rolling(period).mean()
+        
+        return atr
+    except Exception as e:
+        logger.error(f"Error calculating ATR: {str(e)}")
+        # Return series of NaN if calculation fails
+        return pd.Series([np.nan] * len(df), index=df.index)
 
 # ==================== CUSTOM CSS (CYBERPUNK STYLE) ====================
 def inject_custom_css():
