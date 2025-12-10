@@ -72,6 +72,20 @@ LOG_LEVEL = "INFO"  # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
+# ==================== TELEGRAM ALERTS ====================
+# Telegram Bot Configuration
+TELEGRAM_BOT_TOKEN = ""  # Set via sidebar (keep empty for security)
+TELEGRAM_CHAT_ID = ""  # Set via sidebar (keep empty for security)
+
+# Alert Thresholds
+ALERT_RSI_OVERBOUGHT = 70  # RSI threshold for overbought alert
+ALERT_RSI_OVERSOLD = 30  # RSI threshold for oversold alert
+ALERT_MACD_CROSSOVER_ENABLED = True  # Enable MACD crossover detection
+ALERT_PREDICTION_ENABLED = True  # Send alert after prediction
+
+# Alert Cooldown (prevent spam)
+ALERT_COOLDOWN_SECONDS = 300  # 5 minutes cooldown between same alert type
+
 # ==================== APP METADATA ====================
 # Application Information
 APP_TITLE = "BTC LSTM Predictor (RSI & MACD)"

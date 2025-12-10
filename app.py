@@ -274,6 +274,97 @@ def calculate_technical_indicators(df):
     logger.info(f"Technical indicators calculated successfully. Output rows: {len(df_model)}")
     return df_features, df_model
 
+# ==================== TELEGRAM ALERT SYSTEM ====================
+def send_telegram_message(bot_token, chat_id, message):
+    """Send message via Telegram Bot API"""
+    if not bot_token or not chat_id:
+        logger.warning("Telegram credentials not set")
+        return False, "Bot Token or Chat ID not configured"
+    
+    try:
+        import requests
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        payload = {
+            "chat_id": chat_id,
+            "text": message,
+            "parse_mode": "HTML"
+        }
+        response = requests.post(url, data=payload, timeout=5)
+        
+        if response.status_code == 200:
+            logger.info(f"Telegram message sent successfully to {chat_id}")
+            return True, "Message sent!"
+        else:
+            logger.error(f"Telegram API error: {response.text}")
+            return False, f"API Error: {response.status_code}"
+            
+    except Exception as e:
+        logger.error(f"Failed to send Telegram message: {str(e)}")
+        return False, str(e)
+
+def check_and_send_alerts(bot_token, chat_id, rsi_val, macd_val, signal_val, current_price, alert_settings):
+    """Check conditions and send alerts if triggered"""
+    if not bot_token or not chat_id:
+        return
+    
+    alerts_sent = []
+    
+    # RSI Overbought Alert
+    if alert_settings.get('rsi_overbought', False) and rsi_val > config.ALERT_RSI_OVERBOUGHT:
+        message = f"""
+🔴 <b>RSI OVERBOUGHT ALERT</b>
+
+📊 RSI: {rsi_val:.1f} (>{config.ALERT_RSI_OVERBOUGHT})
+💰 BTC Price: ${current_price:,.2f}
+
+⚠️ Market mungkin jenuh beli. Potensi koreksi turun.
+
+🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC
+"""
+        success, _ = send_telegram_message(bot_token, chat_id, message)
+        if success:
+            alerts_sent.append("RSI Overbought")
+    
+    # RSI Oversold Alert
+    if alert_settings.get('rsi_oversold', False) and rsi_val < config.ALERT_RSI_OVERSOLD:
+        message = f"""
+🟢 <b>RSI OVERSOLD ALERT</b>
+
+📊 RSI: {rsi_val:.1f} (<{config.ALERT_RSI_OVERSOLD})
+💰 BTC Price: ${current_price:,.2f}
+
+✅ Market mungkin jenuh jual. Potensi rebound naik.
+
+🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC
+"""
+        success, _ = send_telegram_message(bot_token, chat_id, message)
+        if success:
+            alerts_sent.append("RSI Oversold")
+    
+    # MACD Crossover Alert
+    if alert_settings.get('macd_crossover', False):
+        hist = macd_val - signal_val
+        if abs(hist) < 5:  # Close to crossover
+            trend = "BULLISH 📈" if hist > 0 else "BEARISH 📉"
+            message = f"""
+🔔 <b>MACD SIGNAL</b>
+
+📊 MACD: {macd_val:.2f}
+📉 Signal: {signal_val:.2f}
+📊 Histogram: {hist:.2f}
+
+{trend}
+
+💰 BTC Price: ${current_price:,.2f}
+
+🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC
+"""
+            success, _ = send_telegram_message(bot_token, chat_id, message)
+            if success:
+                alerts_sent.append("MACD Signal")
+    
+    return alerts_sent
+
 # ==================== ASSETS ====================
 def get_bitcoin_logo_base64():
     # SVG string content
@@ -497,6 +588,67 @@ def main():
             st.success("✅ Cache cleared! Reloading fresh data...")
             st.rerun()
         
+        # Telegram Alert Settings
+        st.write("---")
+        st.subheader("📱 Telegram Alerts")
+        
+        # Bot Credentials
+        with st.expander("🔐 Bot Credentials", expanded=False):
+            bot_token = st.text_input(
+                "Bot Token", 
+                value="", 
+                type="password",
+                help="Get from @BotFather on Telegram",
+                key="telegram_bot_token"
+            )
+            chat_id = st.text_input(
+                "Chat ID", 
+                value="",
+                help="Get from @userinfobot on Telegram",
+                key="telegram_chat_id"
+            )
+            
+            # Test Connection Button
+            if st.button("🧪 Test Connection", use_container_width=True):
+                if bot_token and chat_id:
+                    test_msg = f"""
+🎉 <b>Connection Test Successful!</b>
+
+✅ Bot is connected to your Telegram account.
+📱 You will receive alerts here.
+
+🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC
+"""
+                    success, msg = send_telegram_message(bot_token, chat_id, test_msg)
+                    if success:
+                        st.success("✅ Test message sent! Check your Telegram.")
+                    else:
+                        st.error(f"❌ Failed: {msg}")
+                else:
+                    st.warning("⚠️ Please enter both Bot Token and Chat ID")
+        
+        # Alert Toggles
+        st.markdown("**Alert Types:**")
+        alert_rsi_overbought = st.checkbox("🔴 RSI Overbought (>70)", value=False, key="alert_rsi_ob")
+        alert_rsi_oversold = st.checkbox("🟢 RSI Oversold (<30)", value=False, key="alert_rsi_os")
+        alert_macd = st.checkbox("🔔 MACD Signal", value=False, key="alert_macd")
+        alert_prediction = st.checkbox("🎯 Prediction Results", value=False, key="alert_pred")
+        
+        # Store alert settings in session state
+        if 'alert_settings' not in st.session_state:
+            st.session_state['alert_settings'] = {}
+        
+        st.session_state['alert_settings'] = {
+            'rsi_overbought': alert_rsi_overbought,
+            'rsi_oversold': alert_rsi_oversold,
+            'macd_crossover': alert_macd,
+            'prediction': alert_prediction
+        }
+        
+        # Note: bot_token and chat_id are automatically stored in session_state
+        # by Streamlit widgets with key="telegram_bot_token" and key="telegram_chat_id"
+        # No need to manually assign them here
+        
         # Auto-Refresh Toggle
         refresh = st.checkbox("Auto-Refresh (Live Mode)", value=False)
         if refresh:
@@ -624,6 +776,26 @@ def main():
                  f"Histogram > 0 = Momentum naik, Histogram < 0 = Momentum turun."
         )
     
+    # Check and send Telegram alerts (if enabled)
+    if 'alert_settings' in st.session_state and st.session_state.get('alert_settings'):
+        bot_token = st.session_state.get('telegram_bot_token', '')
+        chat_id = st.session_state.get('telegram_chat_id', '')
+        
+        if bot_token and chat_id:
+            alerts_sent = check_and_send_alerts(
+                bot_token, 
+                chat_id, 
+                rsi_val, 
+                macd_val, 
+                signal_val, 
+                current_price,
+                st.session_state['alert_settings']
+            )
+            
+            if alerts_sent:
+                logger.info(f"Alerts sent: {', '.join(alerts_sent)}")
+    
+    
     # Timestamp Info
     last_candle_time = df_raw.index[-1]
     next_candle_time = last_candle_time + timedelta(minutes=15)
@@ -662,6 +834,38 @@ def main():
                                 'diff': diff, 'pct': pct_diff
                             }
                             st.success("✅ Prediksi berhasil!")
+                            
+                            # Send Telegram alert for prediction (if enabled)
+                            if st.session_state.get('alert_settings', {}).get('prediction', False):
+                                bot_token = st.session_state.get('telegram_bot_token', '')
+                                chat_id = st.session_state.get('telegram_chat_id', '')
+                                
+                                if bot_token and chat_id:
+                                    direction = "NAIK 📈" if diff > 0 else "TURUN 📉"
+                                    conf_level = "TINGGI" if conf >= 70 else "SEDANG" if conf >= 55 else "RENDAH"
+                                    pred_time = (datetime.now() + timedelta(minutes=15)).strftime('%H:%M')
+                                    
+                                    pred_msg = f"""
+🎯 <b>LSTM PREDICTION ALERT</b>
+
+💰 Current Price: ${current_price:,.2f}
+🔮 Predicted Price: ${pred_price:,.2f}
+
+📊 Change: {direction} {abs(pct_diff):.2f}%
+💵 Difference: ${abs(diff):,.2f}
+
+🎲 Confidence: {conf_level} ({conf:.1f}%)
+
+📈 Scenarios:
+  • Best: ${scenarios['best']:,.2f}
+  • Likely: ${scenarios['likely']:,.2f}
+  • Worst: ${scenarios['worst']:,.2f}
+
+🕐 Prediction Time: {pred_time} UTC
+
+⚠️ Disclaimer: For reference only, not financial advice.
+"""
+                                    send_telegram_message(bot_token, chat_id, pred_msg)
                         else:
                             st.error("❌ Model gagal menghasilkan prediksi. Silakan coba lagi.")
                             
