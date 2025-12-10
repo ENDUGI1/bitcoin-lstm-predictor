@@ -380,7 +380,8 @@ def calculate_technical_indicators(df):
     logger.debug(f"MACD calculated: {macd_line.iloc[-1]:.4f}")
     
     # ATR (14) - For Model V2
-    df_features['ATR_14'] = calculate_atr(df_features, period=config.ATR_LENGTH)
+    atr_length = getattr(config, 'ATR_LENGTH', 14)  # Fallback to 14 if not in config
+    df_features['ATR_14'] = calculate_atr(df_features, period=atr_length)
     logger.debug(f"ATR calculated: {df_features['ATR_14'].iloc[-1]:.2f}")
     
     # Log Volume - For Model V2
