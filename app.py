@@ -2033,6 +2033,20 @@ def main():
     with st.expander("📊 **TradingView Interactive Chart** (Gambar Trendline, Zoom, dll)", expanded=False):
         st.caption("💡 Chart interaktif dari TradingView. Kamu bisa gambar trendline, fibonacci, dan tools lainnya!")
         render_tradingview_widget()
+        
+        # Link to full TradingView for drawing tools
+        st.markdown("""
+        <a href="https://www.tradingview.com/chart/?symbol=BINANCE:BTCUSDT" target="_blank" 
+           style="display: inline-block; padding: 8px 16px; border-radius: 8px; 
+                  background: linear-gradient(135deg, #131722, #1e222d); 
+                  border: 1px solid rgba(0, 217, 255, 0.3); color: #00D9FF; 
+                  text-decoration: none; font-family: 'Orbitron', sans-serif; 
+                  font-size: 0.85rem; margin-top: 10px;">
+            🎨 Buka TradingView Full (Gambar Trendline, Fibonacci, dll)
+        </a>
+        """, unsafe_allow_html=True)
+        st.caption("💡 Klik tombol di atas untuk akses drawing tools lengkap di TradingView.com")
+
 
     # --- Prediction Core ---
     st.markdown("### 🧬 LSTM Prediction Core")
