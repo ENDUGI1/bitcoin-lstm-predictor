@@ -40,8 +40,10 @@ RETRY_DELAY_SECONDS = 1  # Delay between retries
 
 # ==================== BINANCE API CONFIGURATION ====================
 # Primary data source for real-time BTC data
+# Note: Using data.binance.com instead of api.binance.com 
+# because api.binance.com is blocked from US IPs (Streamlit Cloud)
 DATA_SOURCE = "binance"  # Options: "binance", "yfinance"
-BINANCE_BASE_URL = "https://api.binance.com"
+BINANCE_BASE_URL = "https://data-api.binance.vision"  # Alternative endpoint that works from US
 BINANCE_SYMBOL = "BTCUSDT"
 BINANCE_INTERVAL = "15m"  # Match with DATA_INTERVAL
 BINANCE_LIMIT = 500  # Number of candles to fetch (max 1000)
