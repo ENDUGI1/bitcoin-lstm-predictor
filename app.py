@@ -799,61 +799,75 @@ model, scaler = load_model_and_scaler()
 model_v2, scaler_v2 = load_model_v2()
 
 # ==================== FUNGSI AMBIL DATA LIVE ====================
-@st.cache_data(ttl=config.CACHE_TTL_DATA, show_spinner=False)
 def get_binance_btc_data():
     """
     Fetch real-time BTCUSDT data from Binance Public API.
     Returns DataFrame with columns: Open, High, Low, Close, Volume
+    Includes retry logic for reliability.
     """
     import requests
-    logger.info(f"Fetching Bitcoin data from Binance: {config.BINANCE_SYMBOL}, Interval: {config.BINANCE_INTERVAL}")
+    import time
     
-    try:
-        url = f"{config.BINANCE_BASE_URL}/api/v3/klines"
-        params = {
-            "symbol": config.BINANCE_SYMBOL,
-            "interval": config.BINANCE_INTERVAL,
-            "limit": config.BINANCE_LIMIT
-        }
-        
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        
-        if not data:
-            logger.warning("Binance API returned empty data")
-            return None
-        
-        # Convert to DataFrame
-        # Binance klines format: [OpenTime, Open, High, Low, Close, Volume, CloseTime, ...]
-        df = pd.DataFrame(data, columns=[
-            'OpenTime', 'Open', 'High', 'Low', 'Close', 'Volume',
-            'CloseTime', 'QuoteVolume', 'Trades', 'TakerBuyBase', 'TakerBuyQuote', 'Ignore'
-        ])
-        
-        # Convert to proper types
-        df['Open'] = df['Open'].astype(float)
-        df['High'] = df['High'].astype(float)
-        df['Low'] = df['Low'].astype(float)
-        df['Close'] = df['Close'].astype(float)
-        df['Volume'] = df['Volume'].astype(float)
-        
-        # Convert timestamp to datetime index
-        df['OpenTime'] = pd.to_datetime(df['OpenTime'], unit='ms')
-        df.set_index('OpenTime', inplace=True)
-        
-        # Keep only OHLCV columns (same format as yfinance)
-        df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
-        
-        logger.info(f"✅ Binance data fetched successfully: {len(df)} candles")
-        return df
-        
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Binance API request failed: {str(e)}")
-        return None
-    except Exception as e:
-        logger.error(f"Error processing Binance data: {str(e)}")
-        return None
+    max_retries = 3
+    retry_delay = 1  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Fetching Bitcoin data from Binance (attempt {attempt + 1}/{max_retries})")
+            
+            url = f"{config.BINANCE_BASE_URL}/api/v3/klines"
+            params = {
+                "symbol": config.BINANCE_SYMBOL,
+                "interval": config.BINANCE_INTERVAL,
+                "limit": config.BINANCE_LIMIT
+            }
+            
+            response = requests.get(url, params=params, timeout=15)
+            response.raise_for_status()
+            data = response.json()
+            
+            if not data:
+                logger.warning("Binance API returned empty data")
+                continue
+            
+            # Convert to DataFrame
+            # Binance klines format: [OpenTime, Open, High, Low, Close, Volume, CloseTime, ...]
+            df = pd.DataFrame(data, columns=[
+                'OpenTime', 'Open', 'High', 'Low', 'Close', 'Volume',
+                'CloseTime', 'QuoteVolume', 'Trades', 'TakerBuyBase', 'TakerBuyQuote', 'Ignore'
+            ])
+            
+            # Convert to proper types
+            df['Open'] = df['Open'].astype(float)
+            df['High'] = df['High'].astype(float)
+            df['Low'] = df['Low'].astype(float)
+            df['Close'] = df['Close'].astype(float)
+            df['Volume'] = df['Volume'].astype(float)
+            
+            # Convert timestamp to datetime index
+            df['OpenTime'] = pd.to_datetime(df['OpenTime'], unit='ms')
+            df.set_index('OpenTime', inplace=True)
+            
+            # Keep only OHLCV columns (same format as yfinance)
+            df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
+            
+            logger.info(f"✅ Binance data fetched successfully: {len(df)} candles")
+            return df
+            
+        except requests.exceptions.Timeout:
+            logger.warning(f"Binance API timeout (attempt {attempt + 1}/{max_retries})")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Binance API request failed: {str(e)}")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+        except Exception as e:
+            logger.error(f"Error processing Binance data: {str(e)}")
+            break
+    
+    logger.warning("All Binance API attempts failed")
+    return None
 
 
 @st.cache_data(ttl=config.CACHE_TTL_DATA, show_spinner=False)
