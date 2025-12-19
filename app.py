@@ -36,13 +36,30 @@ st.set_page_config(
 
 # ==================== MANUAL INDICATOR FUNCTIONS (NO DEPENDENCIES) ====================
 def calculate_rsi(series, period=14):
-    """Calculate RSI manually using Pandas"""
+    """
+    Calculate RSI using Wilder's Smoothing Method.
+    This matches pandas_ta library used in model training.
+    """
     delta = series.diff()
-    gain = (delta.where(delta > 0, 0)).fillna(0)
+    gain = delta.where(delta > 0, 0).fillna(0)
     loss = (-delta.where(delta < 0, 0)).fillna(0)
     
-    avg_gain = gain.rolling(window=period, min_periods=1).mean()
-    avg_loss = loss.rolling(window=period, min_periods=1).mean()
+    # First average using SMA for initial value
+    first_avg_gain = gain.iloc[:period].mean()
+    first_avg_loss = loss.iloc[:period].mean()
+    
+    # Wilder's Smoothing: avg = (prev_avg * (n-1) + current) / n
+    avg_gain = gain.copy()
+    avg_loss = loss.copy()
+    
+    avg_gain.iloc[:period] = np.nan
+    avg_loss.iloc[:period] = np.nan
+    avg_gain.iloc[period-1] = first_avg_gain
+    avg_loss.iloc[period-1] = first_avg_loss
+    
+    for i in range(period, len(series)):
+        avg_gain.iloc[i] = (avg_gain.iloc[i-1] * (period - 1) + gain.iloc[i]) / period
+        avg_loss.iloc[i] = (avg_loss.iloc[i-1] * (period - 1) + loss.iloc[i]) / period
     
     rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
