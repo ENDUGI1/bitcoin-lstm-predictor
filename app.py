@@ -800,10 +800,89 @@ model_v2, scaler_v2 = load_model_v2()
 
 # ==================== FUNGSI AMBIL DATA LIVE ====================
 @st.cache_data(ttl=config.CACHE_TTL_DATA, show_spinner=False)
+def get_binance_btc_data():
+    """
+    Fetch real-time BTCUSDT data from Binance Public API.
+    Returns DataFrame with columns: Open, High, Low, Close, Volume
+    """
+    import requests
+    logger.info(f"Fetching Bitcoin data from Binance: {config.BINANCE_SYMBOL}, Interval: {config.BINANCE_INTERVAL}")
+    
+    try:
+        url = f"{config.BINANCE_BASE_URL}/api/v3/klines"
+        params = {
+            "symbol": config.BINANCE_SYMBOL,
+            "interval": config.BINANCE_INTERVAL,
+            "limit": config.BINANCE_LIMIT
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        if not data:
+            logger.warning("Binance API returned empty data")
+            return None
+        
+        # Convert to DataFrame
+        # Binance klines format: [OpenTime, Open, High, Low, Close, Volume, CloseTime, ...]
+        df = pd.DataFrame(data, columns=[
+            'OpenTime', 'Open', 'High', 'Low', 'Close', 'Volume',
+            'CloseTime', 'QuoteVolume', 'Trades', 'TakerBuyBase', 'TakerBuyQuote', 'Ignore'
+        ])
+        
+        # Convert to proper types
+        df['Open'] = df['Open'].astype(float)
+        df['High'] = df['High'].astype(float)
+        df['Low'] = df['Low'].astype(float)
+        df['Close'] = df['Close'].astype(float)
+        df['Volume'] = df['Volume'].astype(float)
+        
+        # Convert timestamp to datetime index
+        df['OpenTime'] = pd.to_datetime(df['OpenTime'], unit='ms')
+        df.set_index('OpenTime', inplace=True)
+        
+        # Keep only OHLCV columns (same format as yfinance)
+        df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
+        
+        logger.info(f"✅ Binance data fetched successfully: {len(df)} candles")
+        return df
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Binance API request failed: {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"Error processing Binance data: {str(e)}")
+        return None
+
+
+@st.cache_data(ttl=config.CACHE_TTL_DATA, show_spinner=False)
 def get_live_bitcoin_data():
-    """Fetch live data from Yahoo Finance with Retry Logic"""
+    """
+    Fetch live Bitcoin data with fallback mechanism.
+    Primary: Binance API (real-time)
+    Fallback: Yahoo Finance (delayed ~15 min)
+    """
     import time
-    logger.info(f"Fetching Bitcoin data: {config.TICKER_SYMBOL}, Period: {config.DATA_PERIOD}, Interval: {config.DATA_INTERVAL}")
+    
+    # Try Binance first if configured
+    data_source = getattr(config, 'DATA_SOURCE', 'yfinance')
+    
+    if data_source == "binance":
+        df = get_binance_btc_data()
+        if df is not None and not df.empty:
+            logger.info("📊 Using Binance data (real-time)")
+            # Track data source for UI indicator
+            st.session_state['data_source_used'] = 'binance'
+            return df
+        else:
+            logger.warning("⚠️ Binance failed, falling back to yfinance...")
+    
+    # Track that we're using yfinance
+    st.session_state['data_source_used'] = 'yfinance'
+    
+    # Fallback to yfinance
+    logger.info(f"Fetching Bitcoin data from yfinance: {config.TICKER_SYMBOL}, Period: {config.DATA_PERIOD}, Interval: {config.DATA_INTERVAL}")
     
     for i in range(config.MAX_RETRIES):
         try:
@@ -816,7 +895,7 @@ def get_live_bitcoin_data():
                 if isinstance(df.columns, pd.MultiIndex):
                     df.columns = df.columns.get_level_values(0)
                 
-                logger.info(f"✅ Data fetched successfully: {len(df)} candles")
+                logger.info(f"✅ yfinance data fetched successfully: {len(df)} candles")
                 return df
                 
             # If empty, wait and retry
@@ -1023,6 +1102,54 @@ def get_bitcoin_logo_base64():
     # SVG string content
     svg = """<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="100%" height="100%" version="1.1" shape-rendering="geometricPrecision" text-rendering="geometricPrecision" image-rendering="optimizeQuality" fill-rule="evenodd" clip-rule="evenodd" viewBox="0 0 4091.27 4091.73" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xodm="http://www.corel.com/coreldraw/odm/2003"><g id="Layer_x0020_1"><metadata id="CorelCorpID_0Corel-Layer"/><g id="_1421344023328"><path fill="#F7931A" fill-rule="nonzero" d="M4030.06 2540.77c-273.24,1096.01 -1383.32,1763.02 -2479.46,1489.71 -1095.68,-273.24 -1762.69,-1383.39 -1489.33,-2479.31 273.12,-1096.13 1383.2,-1763.19 2479,-1489.95 1096.06,273.24 1763.03,1383.51 1489.76,2479.57l0.02 -0.02z"/><path fill="white" fill-rule="nonzero" d="M2947.77 1754.38c40.72,-272.26 -166.56,-418.61 -450,-516.24l91.95 -368.8 -224.5 -55.94 -89.51 359.09c-59.02,-14.72 -119.63,-28.59 -179.87,-42.34l90.16 -361.46 -224.36 -55.94 -92 368.68c-48.84,-11.12 -96.81,-22.11 -143.35,-33.69l0.26 -1.16 -309.59 -77.31 -59.72 239.78c0,0 166.56,38.18 163.05,40.53 90.91,22.69 107.35,82.87 104.62,130.57l-104.74 420.15c6.26,1.59 14.38,3.89 23.34,7.49 -7.49,-1.86 -15.46,-3.89 -23.73,-5.87l-146.81 588.57c-11.11,27.62 -39.31,69.07 -102.87,53.33 2.25,3.26 -163.17,-40.72 -163.17,-40.72l-111.46 256.98 292.15 72.83c54.35,13.63 107.61,27.89 160.06,41.3l-92.9 373.03 224.24 55.94 92 -369.07c61.26,16.63 120.71,31.97 178.91,46.43l-91.69 367.33 224.51 55.94 92.89 -372.33c382.82,72.45 670.67,43.24 791.83,-303.02 97.63,-278.78 -4.86,-439.58 -206.26,-544.44 146.69,-33.83 257.18,-130.31 286.64,-329.61l-0.07 -0.05zm-512.93 719.26c-69.38,278.78 -538.76,128.08 -690.94,90.29l123.28 -494.2c152.17,37.99 640.17,113.17 567.67,403.91zm69.43 -723.3c-63.29,253.58 -453.96,124.75 -580.69,93.16l111.77 -448.21c126.73,31.59 534.85,90.55 468.94,355.05l-0.02 0z"/></g></g></svg>"""
     return base64.b64encode(svg.encode('utf-8')).decode('utf-8')
+
+
+# ==================== TRADINGVIEW INTERACTIVE CHART ====================
+def render_tradingview_widget():
+    """
+    Render TradingView Advanced Chart widget for interactive charting.
+    Features: Real-time data, drawing tools, technical indicators.
+    """
+    # Get config values with fallbacks
+    symbol = getattr(config, 'TRADINGVIEW_SYMBOL', 'BINANCE:BTCUSDT')
+    theme = getattr(config, 'TRADINGVIEW_THEME', 'dark')
+    height = getattr(config, 'TRADINGVIEW_HEIGHT', 500)
+    allow_symbol_change = str(getattr(config, 'TRADINGVIEW_ALLOW_SYMBOL_CHANGE', False)).lower()
+    
+    widget_html = f'''
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container" style="height:{height}px; width:100%;">
+        <div id="tradingview_btc" style="height:100%; width:100%;"></div>
+        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+        <script type="text/javascript">
+        new TradingView.widget({{
+            "autosize": true,
+            "symbol": "{symbol}",
+            "interval": "15",
+            "timezone": "Etc/UTC",
+            "theme": "{theme}",
+            "style": "1",
+            "locale": "en",
+            "enable_publishing": false,
+            "allow_symbol_change": {allow_symbol_change},
+            "hide_top_toolbar": false,
+            "hide_legend": false,
+            "save_image": true,
+            "container_id": "tradingview_btc",
+            "studies": [
+                "RSI@tv-basicstudies",
+                "MACD@tv-basicstudies"
+            ]
+        }});
+        </script>
+    </div>
+    <!-- TradingView Widget END -->
+    '''
+    
+    components.html(widget_html, height=height + 20)
+    logger.info("TradingView widget rendered successfully")
+
+
 
 
 # ==================== LSTM PREDICTION ====================
@@ -1874,9 +2001,38 @@ def main():
     
     st.caption(f"📅 **Data Terakhir:** {last_candle_time.strftime('%Y-%m-%d %H:%M:%S')} UTC | "
                f"🔮 **Prediksi Untuk:** {next_candle_time.strftime('%H:%M')} UTC")
+    
+    # Data Source Indicator
+    data_source_used = st.session_state.get('data_source_used', 'unknown')
+    if data_source_used == 'binance':
+        st.markdown("""
+        <div style="display: inline-block; padding: 4px 12px; border-radius: 20px; 
+                    background: linear-gradient(135deg, rgba(0, 255, 136, 0.15), rgba(0, 217, 255, 0.15)); 
+                    border: 1px solid rgba(0, 255, 136, 0.4); margin-bottom: 10px;">
+            <span style="color: #00FF88; font-weight: bold; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">
+                🔗 Data Source: Binance API (Real-time)
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div style="display: inline-block; padding: 4px 12px; border-radius: 20px; 
+                    background: linear-gradient(135deg, rgba(255, 153, 0, 0.15), rgba(255, 200, 0, 0.15)); 
+                    border: 1px solid rgba(255, 153, 0, 0.4); margin-bottom: 10px;">
+            <span style="color: #FF9900; font-weight: bold; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">
+                🔗 Data Source: Yahoo Finance (Delayed ~15min)
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+
 
     # --- Main Chart ---
     st.plotly_chart(create_main_chart(df_raw, df_full), use_container_width=True)
+
+    # --- TradingView Interactive Chart ---
+    with st.expander("📊 **TradingView Interactive Chart** (Gambar Trendline, Zoom, dll)", expanded=False):
+        st.caption("💡 Chart interaktif dari TradingView. Kamu bisa gambar trendline, fibonacci, dan tools lainnya!")
+        render_tradingview_widget()
 
     # --- Prediction Core ---
     st.markdown("### 🧬 LSTM Prediction Core")

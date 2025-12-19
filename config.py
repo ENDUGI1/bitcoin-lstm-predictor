@@ -31,12 +31,27 @@ MACD_SIGNAL = 9  # Signal line period
 ATR_LENGTH = 14  # Standard ATR period
 
 # ==================== DATA FETCHING ====================
-# Yahoo Finance Configuration
+# Yahoo Finance Configuration (Fallback)
 TICKER_SYMBOL = "BTC-USD"
 DATA_PERIOD = "5d"  # Historical data period
 DATA_INTERVAL = "15m"  # Candle interval
 MAX_RETRIES = 3  # Number of retry attempts for data fetching
 RETRY_DELAY_SECONDS = 1  # Delay between retries
+
+# ==================== BINANCE API CONFIGURATION ====================
+# Primary data source for real-time BTC data
+DATA_SOURCE = "binance"  # Options: "binance", "yfinance"
+BINANCE_BASE_URL = "https://api.binance.com"
+BINANCE_SYMBOL = "BTCUSDT"
+BINANCE_INTERVAL = "15m"  # Match with DATA_INTERVAL
+BINANCE_LIMIT = 500  # Number of candles to fetch (max 1000)
+
+# ==================== TRADINGVIEW WIDGET ====================
+# Interactive chart widget settings
+TRADINGVIEW_SYMBOL = "BINANCE:BTCUSDT"
+TRADINGVIEW_THEME = "dark"
+TRADINGVIEW_HEIGHT = 500
+TRADINGVIEW_ALLOW_SYMBOL_CHANGE = False
 
 # ==================== CACHING ====================
 # Cache TTL (Time To Live) in seconds
