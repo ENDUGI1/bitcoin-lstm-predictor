@@ -870,7 +870,8 @@ def get_binance_btc_data():
     return None
 
 
-@st.cache_data(ttl=config.CACHE_TTL_DATA, show_spinner=False)
+
+
 def get_live_bitcoin_data():
     """
     Fetch live Bitcoin data with fallback mechanism.
