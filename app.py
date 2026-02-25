@@ -76,8 +76,12 @@ def calculate_macd(series, fast=12, slow=26, signal=9):
 
 def calculate_atr(df, period=14):
     """
-    Calculate Average True Range (ATR) manually
-    ATR = Moving Average of True Range
+    Calculate Average True Range (ATR) using Wilder's Smoothing (RMA).
+    This matches pandas_ta.atr() used in model training.
+    
+    RMA formula: rma[i] = (rma[i-1] * (period - 1) + tr[i]) / period
+    Equivalent to EWM with alpha = 1/period.
+    
     True Range = max(High-Low, abs(High-PrevClose), abs(Low-PrevClose))
     """
     try:
@@ -93,7 +97,11 @@ def calculate_atr(df, period=14):
         })
         
         true_range = ranges.max(axis=1)
-        atr = true_range.rolling(period).mean()
+        
+        # Use Wilder's Smoothing (RMA) instead of SMA
+        # RMA is equivalent to EWM with alpha = 1/period
+        # This matches pandas_ta.atr() default method used during training
+        atr = true_range.ewm(alpha=1/period, min_periods=period, adjust=False).mean()
         
         return atr
     except Exception as e:
@@ -1512,7 +1520,7 @@ def main():
             </style>
         """, unsafe_allow_html=True)
         
-        st.title("⚡ SKRIPSI DASHBOARD")
+        st.title("⚡DASHBOARD")
         st.info("**Algoritma:** LSTM\n**Indikator:** RSI & MACD")
         
         st.write("---")
@@ -2191,8 +2199,8 @@ def main():
                 except Exception as e:
                     st.error(f"❌ **Error saat prediksi:** {str(e)}")
                     st.warning("💡 **Troubleshooting:**\n"
-                              "1. Pastikan file model (`model_bitcoin_final.keras`) ada\n"
-                              "2. Pastikan file scaler (`scaler_bitcoin.pkl`) ada\n"
+                              "1. Pastikan file model (`model_bitcoin_v1_4features.keras`) ada\n"
+                              "2. Pastikan file scaler (`scaler_bitcoin_v1.pkl`) ada\n"
                               "3. Coba refresh data dengan tombol di sidebar")
                     # Optional: Log error for debugging
                     import traceback
@@ -2499,7 +2507,7 @@ def main():
             📊 Bitcoin LSTM Prediction Dashboard
         </div>
         <div style="font-size: 0.9rem; color: #BBB; margin-bottom: 15px;">
-            Rancang Bangun Dashboard Prediksi Harga Bitcoin Intraday Menggunakan LSTM Berbasis RSI & MACD
+            Implementasi Algoritma LSTM dengan Indikator RSI dan MACD untuk Prediksi Harga Bitcoin Intraday Berbasis Web
         </div>
         <div style="display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin-bottom: 15px;">
             <div style="font-size: 0.85rem; color: #888;">
@@ -2513,7 +2521,7 @@ def main():
             </div>
         </div>
         <div style="font-size: 0.75rem; color: #666; margin-top: 10px;">
-            Tech Stack: LSTM + RSI + MACD | Data Source: Yahoo Finance | Framework: Streamlit
+            Tech Stack: LSTM + RSI + MACD | Data Source: Binance API + Yahoo Finance (Fallback) | Framework: Streamlit
         </div>
         <div style="font-size: 0.7rem; color: #555; margin-top: 8px;">
             © 2025 Skripsi Project - All Rights Reserved
