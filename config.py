@@ -8,15 +8,10 @@
 SEQUENCE_LENGTH = 60  # Number of candles used for prediction
 PREDICTION_HORIZON_MINUTES = 15  # Prediction timeframe in minutes
 
-# Model V1 Files (4 Features: Close, RSI, MACD, Signal)
+# Model Files (4 Features: Close, RSI, MACD, Signal)
 MODEL_PATH = "model_bitcoin_v1_4features.keras"
 SCALER_PATH = "scaler_bitcoin_v1.pkl"
-MODEL_V1_FEATURES = 4
-
-# Model V2 Files (6 Features: + ATR, Log Volume)
-MODEL_V2_PATH = "model_bitcoin_v2_6features.keras"
-SCALER_V2_PATH = "scaler_bitcoin_v2.pkl"
-MODEL_V2_FEATURES = 6
+MODEL_FEATURES = 4
 
 # ==================== TECHNICAL INDICATORS ====================
 # RSI Configuration
@@ -27,8 +22,7 @@ MACD_FAST = 12   # Fast EMA period
 MACD_SLOW = 26   # Slow EMA period
 MACD_SIGNAL = 9  # Signal line period
 
-# ATR Configuration (for Model V2)
-ATR_LENGTH = 14  # Standard ATR period
+
 
 # ==================== DATA FETCHING ====================
 # Yahoo Finance Configuration (Fallback)
@@ -81,15 +75,12 @@ COLOR_DANGER = "#FF3B69"  # Red
 COLOR_WARNING = "#FF9900"  # Orange
 
 # ==================== CONFIDENCE SCORING ====================
-# Confidence Calculation Parameters (V1)
+# Confidence Calculation Parameters
 CONFIDENCE_BASE = 50  # Base confidence score
 CONFIDENCE_TREND_WEIGHT = 30  # Weight for trend consistency
 CONFIDENCE_VOLATILITY_WEIGHT = 20  # Weight for volatility penalty
 CONFIDENCE_MIN = 40  # Minimum confidence score
 CONFIDENCE_MAX = 90  # Maximum confidence score
-
-# V2 Enhanced Confidence (uses ATR)
-CONFIDENCE_ATR_WEIGHT = 15  # Weight for ATR-based volatility (V2 only)
 
 # Confidence Thresholds
 CONFIDENCE_HIGH_THRESHOLD = 70  # High confidence threshold
