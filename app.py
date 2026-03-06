@@ -22,12 +22,12 @@ logging.basicConfig(
     datefmt=config.LOG_DATE_FORMAT
 )
 logger = logging.getLogger(__name__)
-logger.info("🚀 Bitcoin LSTM Dashboard started")
+logger.info(" Bitcoin LSTM Dashboard started")
 
 # ==================== KONFIGURASI PAGE ====================
 st.set_page_config(
     page_title=config.APP_TITLE,
-    page_icon="bitcoin-btc-logo.png",  # Custom Bitcoin logo
+    page_icon="bitcoin-btc-logo.png", # Custom Bitcoin logo
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -368,9 +368,9 @@ def create_confidence_gauge(confidence, title="Confidence"):
             'borderwidth': 2,
             'bordercolor': "#333",
             'steps': [
-                {'range': [0, 55], 'color': 'rgba(255, 59, 105, 0.3)'},  # Red - Low
-                {'range': [55, 70], 'color': 'rgba(255, 153, 0, 0.3)'},  # Orange - Medium
-                {'range': [70, 100], 'color': 'rgba(0, 255, 136, 0.3)'}  # Green - High
+                {'range': [0, 55], 'color': 'rgba(255, 59, 105, 0.3)'}, # Red - Low
+                {'range': [55, 70], 'color': 'rgba(255, 153, 0, 0.3)'}, # Orange - Medium
+                {'range': [70, 100], 'color': 'rgba(0, 255, 136, 0.3)'} # Green - High
             ],
             'threshold': {
                 'line': {'color': "#BD00FF", 'width': 4},
@@ -408,7 +408,7 @@ def update_actual_prices(tracker_data, current_df):
                 pred_time = datetime.fromisoformat(pred_time)
             
             # Check if prediction is older than 15 minutes
-            if pred_time and (current_time - pred_time).total_seconds() >= 900:  # 15 min = 900 sec
+            if pred_time and (current_time - pred_time).total_seconds() >= 900: # 15 min = 900 sec
                 pred['actual_price'] = current_price
                 updated_count += 1
     
@@ -549,7 +549,7 @@ def run_backtest(start_date, end_date, model_v1, scaler_v1):
         # Run predictions on each timestamp (skip last 1 to have actual price)
         total_points = len(df_model) - 1
         
-        for i in range(60, total_points):  # Start from 60 to have enough history
+        for i in range(60, total_points): # Start from 60 to have enough history
             try:
                 # Get data up to current point
                 df_subset = df_model.iloc[:i+1]
@@ -603,7 +603,7 @@ def run_backtest(start_date, end_date, model_v1, scaler_v1):
         
         return metrics, None
         
-        logger.info("🎉 Model V2 files downloaded successfully!")
+        logger.info(" Model V2 files downloaded successfully!")
         return True
         
     except Exception as e:
@@ -618,10 +618,10 @@ def load_model_and_scaler():
     try:
         model = tf.keras.models.load_model(config.MODEL_PATH)
         scaler = joblib.load(config.SCALER_PATH)
-        logger.info("✅ Model (4 features) loaded successfully")
+        logger.info(" Model (4 features) loaded successfully")
         return model, scaler
     except Exception as e:
-        st.error(f"❌ Error loading Model: {str(e)}")
+        st.error(f" Error loading Model: {str(e)}")
         st.stop()
 
 # Load model
@@ -638,7 +638,7 @@ def get_binance_btc_data():
     import time
     
     max_retries = 3
-    retry_delay = 1  # seconds
+    retry_delay = 1 # seconds
     
     for attempt in range(max_retries):
         try:
@@ -680,7 +680,7 @@ def get_binance_btc_data():
             # Keep only OHLCV columns (same format as yfinance)
             df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
             
-            logger.info(f"✅ Binance data fetched successfully: {len(df)} candles")
+            logger.info(f" Binance data fetched successfully: {len(df)} candles")
             return df
             
         except requests.exceptions.Timeout:
@@ -715,12 +715,12 @@ def get_live_bitcoin_data():
     if data_source == "binance":
         df = get_binance_btc_data()
         if df is not None and not df.empty:
-            logger.info("📊 Using Binance data (real-time)")
+            logger.info(" Using Binance data (real-time)")
             # Track data source for UI indicator
             st.session_state['data_source_used'] = 'binance'
             return df
         else:
-            logger.warning("⚠️ Binance failed, falling back to yfinance...")
+            logger.warning(" Binance failed, falling back to yfinance...")
     
     # Track that we're using yfinance
     st.session_state['data_source_used'] = 'yfinance'
@@ -739,7 +739,7 @@ def get_live_bitcoin_data():
                 if isinstance(df.columns, pd.MultiIndex):
                     df.columns = df.columns.get_level_values(0)
                 
-                logger.info(f"✅ yfinance data fetched successfully: {len(df)} candles")
+                logger.info(f" yfinance data fetched successfully: {len(df)} candles")
                 return df
                 
             # If empty, wait and retry
@@ -749,11 +749,11 @@ def get_live_bitcoin_data():
         except Exception as e:
             logger.error(f"Attempt {i+1}/{config.MAX_RETRIES} failed: {str(e)}")
             if i == config.MAX_RETRIES - 1: # Last attempt
-                st.error(f"❌ Failed to fetch data after {config.MAX_RETRIES} attempts: {str(e)}")
+                st.error(f" Failed to fetch data after {config.MAX_RETRIES} attempts: {str(e)}")
                 st.stop()
             time.sleep(1)
             
-    st.error("❌ Failed to fetch data from Yahoo Finance (Empty Data)")
+    st.error(" Failed to fetch data from Yahoo Finance (Empty Data)")
     st.stop()
 
 # ==================== DATA VALIDATION ====================
@@ -767,37 +767,37 @@ def validate_data_for_prediction(df, min_rows=config.MIN_DATA_ROWS):
     # Check 1: DataFrame not empty
     if df is None or df.empty:
         logger.error("Validation failed: Empty DataFrame")
-        return False, "❌ Data kosong. Tidak bisa melakukan prediksi."
+        return False, " Data kosong. Tidak bisa melakukan prediksi."
     
     # Check 2: Required columns exist
     required_cols = ['Open', 'High', 'Low', 'Close']
     missing_cols = [col for col in required_cols if col not in df.columns]
     if missing_cols:
-        return False, f"❌ Kolom yang diperlukan tidak ada: {', '.join(missing_cols)}"
+        return False, f" Kolom yang diperlukan tidak ada: {', '.join(missing_cols)}"
     
     # Check 3: Sufficient data points
     if len(df) < min_rows:
-        return False, f"❌ Data tidak cukup untuk prediksi. Diperlukan minimal {min_rows} candle, tersedia {len(df)}."
+        return False, f" Data tidak cukup untuk prediksi. Diperlukan minimal {min_rows} candle, tersedia {len(df)}."
     
     # Check 4: No NaN values in critical columns
     if df[required_cols].isnull().any().any():
         nan_cols = df[required_cols].columns[df[required_cols].isnull().any()].tolist()
-        return False, f"❌ Data mengandung nilai kosong (NaN) pada kolom: {', '.join(nan_cols)}"
+        return False, f" Data mengandung nilai kosong (NaN) pada kolom: {', '.join(nan_cols)}"
     
     # Check 5: Price values are positive
     if (df['Close'] <= 0).any():
-        return False, "❌ Data harga mengandung nilai negatif atau nol. Data tidak valid."
+        return False, " Data harga mengandung nilai negatif atau nol. Data tidak valid."
     
     # Check 6: Reasonable price range (sanity check for BTC)
     min_price = df['Close'].min()
     max_price = df['Close'].max()
     if min_price < config.MIN_PRICE_USD or max_price > config.MAX_PRICE_USD:
         logger.error(f"Validation failed: Price out of range (${min_price:,.0f} - ${max_price:,.0f})")
-        return False, f"❌ Harga di luar rentang wajar (${min_price:,.0f} - ${max_price:,.0f}). Kemungkinan data corrupt."
+        return False, f" Harga di luar rentang wajar (${min_price:,.0f} - ${max_price:,.0f}). Kemungkinan data corrupt."
     
     # All checks passed
-    logger.info("✅ Data validation passed")
-    return True, "✅ Data valid untuk prediksi."
+    logger.info(" Data validation passed")
+    return True, " Data valid untuk prediksi."
 
 # ==================== FEATURE ENGINEERING ====================
 @st.cache_data(ttl=config.CACHE_TTL_INDICATORS, show_spinner=False)
@@ -875,14 +875,14 @@ def check_and_send_alerts(bot_token, chat_id, rsi_val, macd_val, signal_val, cur
     # RSI Overbought Alert
     if alert_settings.get('rsi_overbought', False) and rsi_val > config.ALERT_RSI_OVERBOUGHT:
         message = f"""
-🔴 <b>RSI OVERBOUGHT ALERT</b>
+ <b>RSI OVERBOUGHT ALERT</b>
 
-📊 RSI: {rsi_val:.1f} (>{config.ALERT_RSI_OVERBOUGHT})
-💰 BTC Price: ${current_price:,.2f}
+ RSI: {rsi_val:.1f} (>{config.ALERT_RSI_OVERBOUGHT})
+ BTC Price: ${current_price:,.2f}
 
-⚠️ Market mungkin jenuh beli. Potensi koreksi turun.
+ Market mungkin jenuh beli. Potensi koreksi turun.
 
-🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC
+ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC
 """
         success, _ = send_telegram_message(bot_token, chat_id, message)
         if success:
@@ -891,14 +891,14 @@ def check_and_send_alerts(bot_token, chat_id, rsi_val, macd_val, signal_val, cur
     # RSI Oversold Alert
     if alert_settings.get('rsi_oversold', False) and rsi_val < config.ALERT_RSI_OVERSOLD:
         message = f"""
-🟢 <b>RSI OVERSOLD ALERT</b>
+ <b>RSI OVERSOLD ALERT</b>
 
-📊 RSI: {rsi_val:.1f} (<{config.ALERT_RSI_OVERSOLD})
-💰 BTC Price: ${current_price:,.2f}
+ RSI: {rsi_val:.1f} (<{config.ALERT_RSI_OVERSOLD})
+ BTC Price: ${current_price:,.2f}
 
-✅ Market mungkin jenuh jual. Potensi rebound naik.
+ Market mungkin jenuh jual. Potensi rebound naik.
 
-🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC
+ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC
 """
         success, _ = send_telegram_message(bot_token, chat_id, message)
         if success:
@@ -907,20 +907,20 @@ def check_and_send_alerts(bot_token, chat_id, rsi_val, macd_val, signal_val, cur
     # MACD Crossover Alert
     if alert_settings.get('macd_crossover', False):
         hist = macd_val - signal_val
-        if abs(hist) < 5:  # Close to crossover
-            trend = "BULLISH 📈" if hist > 0 else "BEARISH 📉"
+        if abs(hist) < 5: # Close to crossover
+            trend = "BULLISH " if hist > 0 else "BEARISH "
             message = f"""
-🔔 <b>MACD SIGNAL</b>
+ <b>MACD SIGNAL</b>
 
-📊 MACD: {macd_val:.2f}
-📉 Signal: {signal_val:.2f}
-📊 Histogram: {hist:.2f}
+ MACD: {macd_val:.2f}
+ Signal: {signal_val:.2f}
+ Histogram: {hist:.2f}
 
 {trend}
 
-💰 BTC Price: ${current_price:,.2f}
+ BTC Price: ${current_price:,.2f}
 
-🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC
+ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC
 """
             success, _ = send_telegram_message(bot_token, chat_id, message)
             if success:
@@ -989,7 +989,7 @@ def predict_next_price(df_model, model, scaler, sequence_length=config.SEQUENCE_
     
     if len(df_model) < sequence_length:
         logger.error(f"Insufficient data: {len(df_model)} rows (need {sequence_length})")
-        st.error(f"❌ Data insufficient! Need {sequence_length} rows.")
+        st.error(f" Data insufficient! Need {sequence_length} rows.")
         return None, None, None
     
     # Take last 60 rows
@@ -1041,13 +1041,13 @@ def predict_next_price_v2(df_model, model, scaler, sequence_length=config.SEQUEN
     
     if len(df_model) < sequence_length:
         logger.error(f"Insufficient data for V2: {len(df_model)} rows (need {sequence_length})")
-        st.error(f"❌ Data insufficient! Need {sequence_length} rows.")
+        st.error(f" Data insufficient! Need {sequence_length} rows.")
         return None, None, None
     
     # Take last 60 rows (6 features)
     last_sequence = df_model.iloc[-sequence_length:].values
     last_sequence_scaled = scaler.transform(last_sequence)
-    X_input = last_sequence_scaled.reshape(1, sequence_length, 6)  # 6 features!
+    X_input = last_sequence_scaled.reshape(1, sequence_length, 6) # 6 features!
     
     logger.debug(f"V2 Input shape: {X_input.shape}")
     prediction_scaled = model.predict(X_input, verbose=0)
@@ -1074,7 +1074,7 @@ def predict_next_price_v2(df_model, model, scaler, sequence_length=config.SEQUEN
     
     # Normalize ATR relative to price (ATR as % of price)
     atr_normalized = current_atr / current_price
-    atr_factor = min(atr_normalized * 100, 1.0)  # Cap at 1.0
+    atr_factor = min(atr_normalized * 100, 1.0) # Cap at 1.0
     
     # Calculate base factors
     volatility_factor = min(volatility / np.mean(recent_prices) * 100, 1.0)
@@ -1083,7 +1083,7 @@ def predict_next_price_v2(df_model, model, scaler, sequence_length=config.SEQUEN
     confidence = (config.CONFIDENCE_BASE + 
                   (trend_consistency * config.CONFIDENCE_TREND_WEIGHT) - 
                   (volatility_factor * config.CONFIDENCE_VOLATILITY_WEIGHT) -
-                  (atr_factor * config.CONFIDENCE_ATR_WEIGHT))  # NEW: ATR penalty
+                  (atr_factor * config.CONFIDENCE_ATR_WEIGHT)) # NEW: ATR penalty
     
     confidence = max(config.CONFIDENCE_MIN, min(config.CONFIDENCE_MAX, confidence))
     
@@ -1181,7 +1181,7 @@ def create_pattern_chart(df_features, sequence_length=60):
     fig.update_layout(
         xaxis_title="Candle Index (0 = Oldest, 59 = Current)",
         yaxis_title="Price (USD)",
-        height=500,  # Increased from 350 to 500
+        height=500, # Increased from 350 to 500
         hovermode='x unified',
         showlegend=True,
         plot_bgcolor='rgba(0,0,0,0.05)',
@@ -1290,23 +1290,23 @@ def main():
             </style>
         """, unsafe_allow_html=True)
         
-        st.title("⚡DASHBOARD")
+        st.title("DASHBOARD")
         st.info("**Algoritma:** LSTM\n**Indikator:** RSI & MACD")
         
         st.write("---")
         
         # Model Info
-        st.subheader("📊 Model Info")
+        st.subheader(" Model Info")
         st.markdown("""
-        **Architecture:** LSTM (60 timesteps)  
-        **Features (4):** Close, RSI, MACD, Signal  
-        **Prediction Horizon:** 15 Minutes  
+        **Architecture:** LSTM (60 timesteps) 
+        **Features (4):** Close, RSI, MACD, Signal 
+        **Prediction Horizon:** 15 Minutes 
         """)
 
         st.write("---")
 
         # Model Performance Tracker
-        st.subheader("📊 Model Performance")
+        st.subheader(" Model Performance")
         
         # Initialize performance tracking in session state from persistent storage
         if 'performance_tracker' not in st.session_state:
@@ -1326,11 +1326,11 @@ def main():
                 st.metric("Directional Accuracy", f"{metrics['directional_accuracy']:.1f}%")
                 st.caption(f"MAE: ${metrics['mae']:.2f}")
                 st.caption(f"RMSE: ${metrics['rmse']:.2f}")
-                st.caption(f"📊 {metrics['total_predictions']} verified")
+                st.caption(f" {metrics['total_predictions']} verified")
             else:
                 st.metric("Accuracy", f"{accuracy:.1f}%")
-                st.caption(f"📈 {len(tracker['predictions'])} predictions")
-                st.caption("⏳ Awaiting actual prices")
+                st.caption(f" {len(tracker['predictions'])} predictions")
+                st.caption("Awaiting actual prices")
             
             # Reset button
             if st.button("Reset Tracker", use_container_width=True):
@@ -1345,7 +1345,7 @@ def main():
                     'correct': 0,
                     'last_actual_price': None
                 }
-                st.success("✅ Tracker reset successfully!")
+                st.success(" Tracker reset successfully!")
                 st.rerun()
             
             # Manual Update Actual Prices Button
@@ -1355,19 +1355,19 @@ def main():
                 st.rerun()
 
         else:
-            st.info("📊 Run predictions to start tracking performance!")
+            st.info(" Run predictions to start tracking performance!")
         
         # Prediction History & Error Analysis
         if len(tracker.get('predictions', [])) > 0:
             st.write("---")
-            with st.expander("📋 Prediction History & Errors", expanded=False):
+            with st.expander(" Prediction History & Errors", expanded=False):
                 st.caption("View individual prediction errors and identify outliers")
                 
                 pred_data = []
-                for i, pred in enumerate(tracker['predictions'][-10:], 1):  # Last 10
+                for i, pred in enumerate(tracker['predictions'][-10:], 1): # Last 10
                     if pred.get('actual_price') is not None:
                         error = abs(pred['predicted_price'] - pred['actual_price'])
-                        direction_correct = "✅" if pred.get('direction') == ('up' if pred['actual_price'] > pred['current_price'] else 'down') else "❌"
+                        direction_correct = "" if pred.get('direction') == ('up' if pred['actual_price'] > pred['current_price'] else 'down') else ""
                         pred_data.append({
                             '#': i,
                             'Predicted': f"${pred['predicted_price']:.2f}",
@@ -1388,15 +1388,15 @@ def main():
                         std_error = np.std(errors)
                         outliers = [i+1 for i, e in enumerate(errors) if abs(e - mean_error) > 2 * std_error]
                         if outliers:
-                            st.warning(f"⚠️ Outliers detected: #{', #'.join(map(str, outliers))}")
+                            st.warning(f" Outliers detected: #{', #'.join(map(str, outliers))}")
                 else:
-                    st.caption("⏳ No verified predictions yet")
+                    st.caption("No verified predictions yet")
 
         st.write("---")
-        st.subheader("⚙️ Settings")
+        st.subheader(" Settings")
         
         # Backtesting Section (NEW!)
-        with st.expander("🧪 Backtesting Dashboard", expanded=False):
+        with st.expander(" Backtesting Dashboard", expanded=False):
             st.caption("Test models on historical data")
             
             # Date range selector
@@ -1415,38 +1415,38 @@ def main():
                 )
             
             # Run backtest button
-            if st.button("🚀 Run Backtest", use_container_width=True):
+            if st.button(" Run Backtest", use_container_width=True):
                 if start_date >= end_date:
-                    st.error("❌ Start date must be before end date")
+                    st.error(" Start date must be before end date")
                 else:
-                    with st.spinner("⚡ Running backtest... This may take a few minutes..."):
+                    with st.spinner(" Running backtest... This may take a few minutes..."):
                         metrics, error = run_backtest(
                             start_date, end_date,
                             model, scaler
                         )
                         
                         if error:
-                            st.error(f"❌ Backtest failed: {error}")
+                            st.error(f" Backtest failed: {error}")
                         elif metrics:
                             st.session_state['backtest_results'] = metrics
-                            st.success("✅ Backtest complete! Scroll down to see results.")
+                            st.success(" Backtest complete! Scroll down to see results.")
                             st.rerun()
                         else:
-                            st.error("❌ No results generated")
+                            st.error(" No results generated")
         
 
         # Force Refresh Button
         if st.button("Force Refresh Data", use_container_width=True):
             st.cache_data.clear()
-            st.success("✅ Cache cleared! Reloading fresh data...")
+            st.success(" Cache cleared! Reloading fresh data...")
             st.rerun()
         
         # Telegram Alert Settings
         st.write("---")
-        st.subheader("📱 Telegram Alerts")
+        st.subheader(" Telegram Alerts")
         
         # Bot Credentials
-        with st.expander("🔐 Bot Credentials", expanded=False):
+        with st.expander(" Bot Credentials", expanded=False):
             bot_token = st.text_input(
                 "Bot Token", 
                 value="", 
@@ -1462,30 +1462,30 @@ def main():
             )
             
             # Test Connection Button
-            if st.button("🧪 Test Connection", use_container_width=True):
+            if st.button(" Test Connection", use_container_width=True):
                 if bot_token and chat_id:
                     test_msg = f"""
-🎉 <b>Connection Test Successful!</b>
+ <b>Connection Test Successful!</b>
 
-✅ Bot is connected to your Telegram account.
-📱 You will receive alerts here.
+ Bot is connected to your Telegram account.
+ You will receive alerts here.
 
-🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC
+ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC
 """
                     success, msg = send_telegram_message(bot_token, chat_id, test_msg)
                     if success:
-                        st.success("✅ Test message sent! Check your Telegram.")
+                        st.success(" Test message sent! Check your Telegram.")
                     else:
-                        st.error(f"❌ Failed: {msg}")
+                        st.error(f" Failed: {msg}")
                 else:
-                    st.warning("⚠️ Please enter both Bot Token and Chat ID")
+                    st.warning(" Please enter both Bot Token and Chat ID")
         
         # Alert Toggles
         st.markdown("**Alert Types:**")
-        alert_rsi_overbought = st.checkbox("🔴 RSI Overbought (>70)", value=False, key="alert_rsi_ob")
-        alert_rsi_oversold = st.checkbox("🟢 RSI Oversold (<30)", value=False, key="alert_rsi_os")
-        alert_macd = st.checkbox("🔔 MACD Signal", value=False, key="alert_macd")
-        alert_prediction = st.checkbox("🎯 Prediction Results", value=False, key="alert_pred")
+        alert_rsi_overbought = st.checkbox(" RSI Overbought (>70)", value=False, key="alert_rsi_ob")
+        alert_rsi_oversold = st.checkbox(" RSI Oversold (<30)", value=False, key="alert_rsi_os")
+        alert_macd = st.checkbox(" MACD Signal", value=False, key="alert_macd")
+        alert_prediction = st.checkbox(" Prediction Results", value=False, key="alert_pred")
         
         # Store alert settings in session state
         if 'alert_settings' not in st.session_state:
@@ -1588,7 +1588,7 @@ def main():
         components.html(clock_html, height=100)
 
     # --- Data Loading ---
-    with st.spinner("📡 Fetching Market Data..."):
+    with st.spinner(" Fetching Market Data..."):
         df_raw = get_live_bitcoin_data()
         df_full, df_model = calculate_technical_indicators(df_raw)
     
@@ -1611,10 +1611,10 @@ def main():
             if updated > 0:
                 save_tracker_data(tracker)
                 st.session_state['performance_tracker'] = tracker
-                st.success(f"✅ Updated {updated} predictions with actual prices!")
-                st.info("💡 Refresh to see updated metrics")
+                st.success(f" Updated {updated} predictions with actual prices!")
+                st.info(" Refresh to see updated metrics")
             else:
-                st.info("ℹ️ All predictions already have actual prices")
+                st.info(" All predictions already have actual prices")
         
         # Clear the flag
         st.session_state['trigger_manual_update'] = False
@@ -1634,7 +1634,7 @@ def main():
         )
     with m2:
         rsi_val = df_full['RSI_14'].iloc[-1]
-        rsi_status = "🔴 Overbought" if rsi_val > 70 else "🟢 Oversold" if rsi_val < 30 else "⚪ Netral"
+        rsi_status = " Overbought" if rsi_val > 70 else " Oversold" if rsi_val < 30 else " Netral"
         st.metric(
             "RSI (14)", 
             f"{rsi_val:.1f}", 
@@ -1647,7 +1647,7 @@ def main():
         macd_val = df_full['MACD_12_26_9'].iloc[-1]
         signal_val = df_full['MACDs_12_26_9'].iloc[-1]
         hist = macd_val - signal_val
-        momentum = "🟢 Bullish" if hist > 0 else "🔴 Bearish"
+        momentum = " Bullish" if hist > 0 else " Bearish"
         st.metric(
             "MACD", 
             f"{macd_val:.2f}", 
@@ -1680,8 +1680,8 @@ def main():
     last_candle_time = df_raw.index[-1]
     next_candle_time = last_candle_time + timedelta(minutes=15)
     
-    st.caption(f"📅 **Data Terakhir:** {last_candle_time.strftime('%Y-%m-%d %H:%M:%S')} UTC | "
-               f"🔮 **Prediksi Untuk:** {next_candle_time.strftime('%H:%M')} UTC")
+    st.caption(f" **Data Terakhir:** {last_candle_time.strftime('%Y-%m-%d %H:%M:%S')} UTC | "
+               f" **Prediksi Untuk:** {next_candle_time.strftime('%H:%M')} UTC")
     
     # Data Source Indicator
     data_source_used = st.session_state.get('data_source_used', 'unknown')
@@ -1691,7 +1691,7 @@ def main():
                     background: linear-gradient(135deg, rgba(0, 255, 136, 0.15), rgba(0, 217, 255, 0.15)); 
                     border: 1px solid rgba(0, 255, 136, 0.4); margin-bottom: 10px;">
             <span style="color: #00FF88; font-weight: bold; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">
-                🔗 Data Source: Binance API (Real-time)
+                 Data Source: Binance API (Real-time)
             </span>
         </div>
         """, unsafe_allow_html=True)
@@ -1701,7 +1701,7 @@ def main():
                     background: linear-gradient(135deg, rgba(255, 153, 0, 0.15), rgba(255, 200, 0, 0.15)); 
                     border: 1px solid rgba(255, 153, 0, 0.4); margin-bottom: 10px;">
             <span style="color: #FF9900; font-weight: bold; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">
-                🔗 Data Source: Yahoo Finance (Delayed ~15min)
+                 Data Source: Yahoo Finance (Delayed ~15min)
             </span>
         </div>
         """, unsafe_allow_html=True)
@@ -1711,8 +1711,8 @@ def main():
     st.plotly_chart(create_main_chart(df_raw, df_full), use_container_width=True)
 
     # --- TradingView Interactive Chart ---
-    with st.expander("📊 **TradingView Interactive Chart** (Gambar Trendline, Zoom, dll)", expanded=False):
-        st.caption("💡 Chart interaktif dari TradingView. Kamu bisa gambar trendline, fibonacci, dan tools lainnya!")
+    with st.expander(" **TradingView Interactive Chart** (Gambar Trendline, Zoom, dll)", expanded=False):
+        st.caption(" Chart interaktif dari TradingView. Kamu bisa gambar trendline, fibonacci, dan tools lainnya!")
         render_tradingview_widget()
         
         # Link to full TradingView for drawing tools
@@ -1723,29 +1723,29 @@ def main():
                   border: 1px solid rgba(0, 217, 255, 0.3); color: #00D9FF; 
                   text-decoration: none; font-family: 'Orbitron', sans-serif; 
                   font-size: 0.85rem; margin-top: 10px;">
-            🎨 Buka TradingView Full (Gambar Trendline, Fibonacci, dll)
+             Buka TradingView Full (Gambar Trendline, Fibonacci, dll)
         </a>
         """, unsafe_allow_html=True)
-        st.caption("💡 Klik tombol di atas untuk akses drawing tools lengkap di TradingView.com")
+        st.caption(" Klik tombol di atas untuk akses drawing tools lengkap di TradingView.com")
 
 
     # --- Prediction Core ---
-    st.markdown("### 🧬 LSTM Prediction Core")
+    st.markdown("### LSTM Prediction Core")
     
     col_pred_btn, col_pred_res = st.columns([1, 3])
     
     with col_pred_btn:
-        if st.button("🚀 RUN PREDICTION MODEL", use_container_width=True, type="primary"):
+        if st.button(" RUN PREDICTION MODEL", use_container_width=True, type="primary"):
             # Validate data first
             is_valid, validation_msg = validate_data_for_prediction(df_raw, min_rows=60)
             
             if not is_valid:
                 st.error(validation_msg)
-                st.warning("💡 **Saran:** Coba klik tombol 'Force Refresh Data' di sidebar untuk mendapatkan data terbaru.")
+                st.warning(" **Saran:** Coba klik tombol 'Force Refresh Data' di sidebar untuk mendapatkan data terbaru.")
             else:
                 # Data valid, proceed with prediction
                 try:
-                    with st.spinner("⚡ Running LSTM Inference..."):
+                    with st.spinner(" Running LSTM Inference..."):
                         pred_price, conf, scenarios = predict_next_price(df_model, model, scaler)
                         
                         if pred_price:
@@ -1756,7 +1756,7 @@ def main():
                                 'price': pred_price, 'conf': conf, 'scenarios': scenarios,
                                 'diff': diff, 'pct': pct_diff
                             }
-                            st.success("✅ Prediksi berhasil!")
+                            st.success(" Prediksi berhasil!")
                             
                             # Track prediction for performance monitoring
                             tracker = st.session_state.get('performance_tracker', {
@@ -1790,42 +1790,42 @@ def main():
                                 chat_id = st.session_state.get('telegram_chat_id', '')
                                 
                                 if bot_token and chat_id:
-                                    direction = "NAIK 📈" if diff > 0 else "TURUN 📉"
+                                    direction = "NAIK " if diff > 0 else "TURUN "
                                     conf_level = "TINGGI" if conf >= 70 else "SEDANG" if conf >= 55 else "RENDAH"
                                     pred_time = (datetime.now() + timedelta(minutes=15)).strftime('%H:%M')
                                     
                                     pred_msg = f"""
-🎯 <b>LSTM PREDICTION ALERT</b>
+ <b>LSTM PREDICTION ALERT</b>
 
-💰 Current Price: ${current_price:,.2f}
-🔮 Predicted Price: ${pred_price:,.2f}
+ Current Price: ${current_price:,.2f}
+ Predicted Price: ${pred_price:,.2f}
 
-📊 Change: {direction} {abs(pct_diff):.2f}%
-💵 Difference: ${abs(diff):,.2f}
+ Change: {direction} {abs(pct_diff):.2f}%
+ Difference: ${abs(diff):,.2f}
 
-🎲 Confidence: {conf_level} ({conf:.1f}%)
+ Confidence: {conf_level} ({conf:.1f}%)
 
-📈 Scenarios:
+ Scenarios:
   • Best: ${scenarios['best']:,.2f}
   • Likely: ${scenarios['likely']:,.2f}
   • Worst: ${scenarios['worst']:,.2f}
 
-🕐 Prediction Time: {pred_time} UTC
+ Prediction Time: {pred_time} UTC
 
-⚠️ Disclaimer: For reference only, not financial advice.
+ Disclaimer: For reference only, not financial advice.
 """
                                     send_telegram_message(bot_token, chat_id, pred_msg)
                         else:
-                            st.error("❌ Model gagal menghasilkan prediksi. Silakan coba lagi.")
+                            st.error(" Model gagal menghasilkan prediksi. Silakan coba lagi.")
                             
                 except Exception as e:
-                    st.error(f"❌ **Error saat prediksi:** {str(e)}")
-                    st.warning("💡 **Troubleshooting:**\n"
+                    st.error(f" **Error saat prediksi:** {str(e)}")
+                    st.warning(" **Troubleshooting:**\n"
                               "1. Pastikan file model (`model_bitcoin_v1_4features.keras`) ada\n"
                               "2. Pastikan file scaler (`scaler_bitcoin_v1.pkl`) ada\n"
                               "3. Coba refresh data dengan tombol di sidebar")
                     import traceback
-                    with st.expander("🔍 Detail Error (untuk debugging)"):
+                    with st.expander(" Detail Error (untuk debugging)"):
                         st.code(traceback.format_exc())
 
     with col_pred_res:
@@ -1860,16 +1860,16 @@ def main():
                 <div style="padding: 20px; background: rgba(255, 255, 255, 0.02); border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.08);">
                     <div style="color: #8899A6; font-size: 0.85rem; font-family: 'Orbitron', sans-serif; letter-spacing: 1px;">SCENARIO ANALYSIS</div>
                     <div style="font-size: 0.95rem; margin-top: 12px; font-family: 'Rajdhani', sans-serif; font-weight: 500;">
-                        <div style="margin-bottom: 6px;"><span style="color: var(--success-color);">🚀 BULL:</span> <span style="font-family: 'JetBrains Mono';">${res['scenarios']['best']:,.0f}</span></div>
-                        <div style="margin-bottom: 6px;"><span style="color: #8899A6;">🎯 BASE:</span> <span style="font-family: 'JetBrains Mono'; color: #FFF;">${res['scenarios']['likely']:,.0f}</span></div>
-                        <div><span style="color: var(--danger-color);">⚠️ BEAR:</span> <span style="font-family: 'JetBrains Mono';">${res['scenarios']['worst']:,.0f}</span></div>
+                        <div style="margin-bottom: 6px;"><span style="color: var(--success-color);"> BULL:</span> <span style="font-family: 'JetBrains Mono';">${res['scenarios']['best']:,.0f}</span></div>
+                        <div style="margin-bottom: 6px;"><span style="color: #8899A6;"> BASE:</span> <span style="font-family: 'JetBrains Mono'; color: #FFF;">${res['scenarios']['likely']:,.0f}</span></div>
+                        <div><span style="color: var(--danger-color);"> BEAR:</span> <span style="font-family: 'JetBrains Mono';">${res['scenarios']['worst']:,.0f}</span></div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
             # Confidence Gauge Visualization (NEW!)
             st.markdown("---")
-            st.markdown("#### 📊 Confidence Visualization")
+            st.markdown("#### Confidence Visualization")
             
             gauge_col1, gauge_col2 = st.columns([1, 2])
             
@@ -1887,15 +1887,15 @@ def main():
                 - **Volatility Penalty:** Up to -20%
                 """)
                 
-                st.caption("💡 Uses basic volatility calculation")
+                st.caption(" Uses basic volatility calculation")
                 
                 # Confidence level indicator
                 if res['conf'] >= 70:
-                    st.success("🟢 **HIGH CONFIDENCE** - Strong signal")
+                    st.success(" **HIGH CONFIDENCE** - Strong signal")
                 elif res['conf'] >= 55:
-                    st.warning("🟡 **MEDIUM CONFIDENCE** - Moderate signal")
+                    st.warning(" **MEDIUM CONFIDENCE** - Moderate signal")
                 else:
-                    st.error("🔴 **LOW CONFIDENCE** - Weak signal, use caution")
+                    st.error(" **LOW CONFIDENCE** - Weak signal, use caution")
             
 
             # --- Interpretation & Disclaimer ---
@@ -1904,15 +1904,15 @@ def main():
             # Interpretasi dengan confidence
             confidence_text = "TINGGI" if res['conf'] >= 70 else "SEDANG" if res['conf'] >= 55 else "RENDAH"
             direction_text = "NAIK" if res['diff'] > 0 else "TURUN"
-            direction_emoji = "📈" if res['diff'] > 0 else "📉"
+            direction_emoji = "" if res['diff'] > 0 else ""
             
             # Waktu prediksi (+15 menit dari sekarang)
             pred_time = (datetime.now() + timedelta(minutes=15)).strftime('%H:%M')
             
             # Interpretasi AI (Full Width)
             st.info(f"""
-            **💡 Interpretasi AI:**  
-            Berdasarkan analisis pola LSTM, model memprediksi bahwa dalam **15 menit ke depan** (sekitar pukul **{pred_time}**),  
+            ** Interpretasi AI:** 
+            Berdasarkan analisis pola LSTM, model memprediksi bahwa dalam **15 menit ke depan** (sekitar pukul **{pred_time}**), 
             harga Bitcoin berpotensi **{direction_text} {direction_emoji}** sebesar **{abs(res['pct']):.2f}%** menuju level **${res['price']:,.2f}**.
             
             **Tingkat Keyakinan (Confidence): {confidence_text} ({res['conf']:.1f}%)**
@@ -1920,7 +1920,7 @@ def main():
             
             # Disclaimer (Full Width)
             st.warning("""
-            **⚠️ Disclaimer Penting:**
+            ** Disclaimer Penting:**
             1. **Akurasi Model:** LSTM untuk timeframe 15 menit memiliki volatilitas tinggi (akurasi estimasi 55-65%).
             2. **Data Input:** Prediksi ini murni berdasarkan pola historis **60 candle terakhir** (15 jam ke belakang).
             3. **Faktor Eksternal:** Market crypto sangat dipengaruhi news/event global yang tidak bisa dilihat oleh model ini.
@@ -1929,49 +1929,18 @@ def main():
             
             # Pattern Visualizer (Full Width, Larger)
             st.markdown("---")
-            st.subheader("🔍 60-Candle Pattern (Input Model LSTM)")
+            st.subheader(" 60-Candle Pattern (Input Model LSTM)")
             st.caption("Grafik ini menunjukkan 60 data point terakhir yang 'dilihat' oleh model sebelum membuat prediksi. "
                       "Model LSTM menganalisis pola Close, RSI, MACD, dan Signal dari 60 candle ini untuk memprediksi harga berikutnya.")
             
             # Create larger pattern chart
             pattern_fig = create_pattern_chart(df_model)
             st.plotly_chart(pattern_fig, use_container_width=True)
-            
-            # CSV Export Feature
-            st.markdown("---")
-            st.subheader("📥 Export Hasil Prediksi")
-            
-            # Prepare export data with readable column names
-            export_data = {
-                'Date': [datetime.now().strftime('%Y-%m-%d')],
-                'Time': [datetime.now().strftime('%H:%M:%S')],
-                'Current_Price_USD': [round(current_price, 2)],
-                'Predicted_Price_USD': [round(res['price'], 2)],
-                'Price_Change_USD': [round(res['diff'], 2)],
-                'Price_Change_Percent': [round(res['pct'], 2)],
-                'Confidence_Percent': [round(res['conf'], 1)],
-                'Best_Case_USD': [round(res['scenarios']['best'], 2)],
-                'Likely_Case_USD': [round(res['scenarios']['likely'], 2)],
-                'Worst_Case_USD': [round(res['scenarios']['worst'], 2)],
-                'RSI_14': [round(df_full['RSI_14'].iloc[-1], 2)],
-                'MACD': [round(macd_val, 4)],
-                'MACD_Signal': [round(signal_val, 4)]
-            }
-            
-            export_df = pd.DataFrame(export_data)
-            csv = export_df.to_csv(index=False).encode('utf-8')
-            
-            st.download_button(
-                label="💾 Download Prediction Report (CSV)",
-                data=csv,
-                file_name=f"btc_prediction_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
+
     
     # Accuracy Trend Chart
     st.markdown("---")
-    st.markdown("### 📈 Accuracy Trend Analysis")
+    st.markdown("### Accuracy Trend Analysis")
     st.caption("Model accuracy evolving over time")
     
     if 'performance_tracker' in st.session_state:
@@ -1985,20 +1954,20 @@ def main():
             verified = len([p for p in tracker.get('predictions', []) if p.get('actual_price') is not None])
             
             st.info(f"""
-            **💡 Trend Insights:**
+            ** Trend Insights:**
             - Chart shows how accuracy evolves as more predictions are verified
             - {verified} verified predictions
             - Look for upward trends in directional accuracy and downward trends in MAE/RMSE
             """)
         else:
-            st.info("📊 Need at least 2 verified predictions to show trends. Keep making predictions!")
+            st.info(" Need at least 2 verified predictions to show trends. Keep making predictions!")
     
     # Backtest Results Display
     if 'backtest_results' in st.session_state:
         bt_results = st.session_state['backtest_results']
         
         st.markdown("---")
-        st.markdown("### 🧪 Backtesting Results")
+        st.markdown("### Backtesting Results")
         st.caption("Historical model performance on past data")
         
         if bt_results.get('v1'):
@@ -2017,7 +1986,7 @@ def main():
         
         # Insights
         st.info("""
-        **💡 Backtest Insights:**
+        ** Backtest Insights:**
         - Results based on historical data (past performance)
         - Large sample size provides statistical significance
         - Use these metrics to validate model performance
@@ -2028,20 +1997,20 @@ def main():
     st.markdown("""
     <div style="text-align: center; padding: 20px; background: rgba(255,255,255,0.02); border-radius: 10px; margin-top: 30px;">
         <div style="font-size: 1.1rem; font-weight: bold; color: #00D9FF; margin-bottom: 10px;">
-            📊 Bitcoin LSTM Prediction Dashboard
+             Bitcoin LSTM Prediction Dashboard
         </div>
         <div style="font-size: 0.9rem; color: #BBB; margin-bottom: 15px;">
             Implementasi Algoritma LSTM dengan Indikator RSI dan MACD untuk Prediksi Harga Bitcoin Intraday Berbasis Web
         </div>
         <div style="display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin-bottom: 15px;">
             <div style="font-size: 0.85rem; color: #888;">
-                <span style="color: #BD00FF;">👨‍💻 Developer:</span> Ahmad Nur Fauzan
+                <span style="color: #BD00FF;"> Developer:</span> Ahmad Nur Fauzan
             </div>
             <div style="font-size: 0.85rem; color: #888;">
-                <span style="color: #BD00FF;">🎓 NIM:</span> 2209106057
+                <span style="color: #BD00FF;"> NIM:</span> 2209106057
             </div>
             <div style="font-size: 0.85rem; color: #888;">
-                <span style="color: #BD00FF;">🏛️ Program Studi:</span> Informatika
+                <span style="color: #BD00FF;"> Program Studi:</span> Informatika
             </div>
         </div>
         <div style="font-size: 0.75rem; color: #666; margin-top: 10px;">

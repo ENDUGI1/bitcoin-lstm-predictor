@@ -4,6 +4,13 @@
       "timestamp": "2026-03-06T07:52:48.992025",
       "predicted_price": 71117.52713862658,
       "current_price": 70850.49,
+      "direction": "up",
+      "actual_price": 70109.2
+    },
+    {
+      "timestamp": "2026-03-06T20:22:28.513399",
+      "predicted_price": 70294.62694730758,
+      "current_price": 70079.76,
       "direction": "up"
     }
   ],
