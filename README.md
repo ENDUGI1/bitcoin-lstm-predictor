@@ -6,6 +6,10 @@ Repositori ini berisi kode untuk dashboard prediksi harga Bitcoin menggunakan al
 Aplikasi ini sudah dideploy dan dapat diakses melalui:
 👉 **[btc-predict-lstm-057.streamlit.app](https://btc-predict-lstm-057.streamlit.app/)**
 
+## Source Code Pelatihan (Jupyter Notebook)
+Seluruh tahapan pra-pemrosesan data, desain arsitektur Stacked LSTM, hingga proses pelatihan model (training) dan evaluasinya dapat diakses langsung secara transparan pada Google Colab berikut:
+👉 **[Buka Kode Pelatihan Model di Google Colab](https://colab.research.google.com/drive/1-M-irrfB0srhtwqKLY9F_n3gtY1FKn80?usp=sharing)**
+
 ## Dataset Information
 Model ini dilatih menggunakan data historis BTC/USD. Berikut adalah sumber datanya:
 1. **Sumber Asli**: [Bitcoin Historical Data (Kaggle)](https://www.kaggle.com/datasets/mczielinski/bitcoin-historical-data)
