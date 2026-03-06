@@ -48,3 +48,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Runtime data
+tracker_data.json
+
+# Debug scripts
+debug_*.py
