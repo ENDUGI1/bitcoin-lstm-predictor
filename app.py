@@ -1367,7 +1367,7 @@ def main():
                 for i, pred in enumerate(tracker['predictions'][-10:], 1): # Last 10
                     if pred.get('actual_price') is not None:
                         error = abs(pred['predicted_price'] - pred['actual_price'])
-                        direction_correct = "" if pred.get('direction') == ('up' if pred['actual_price'] > pred['current_price'] else 'down') else ""
+                        direction_correct = "Benar" if pred.get('direction') == ('up' if pred['actual_price'] > pred['current_price'] else 'down') else "Salah"
                         pred_data.append({
                             '#': i,
                             'Predicted': f"${pred['predicted_price']:.2f}",
