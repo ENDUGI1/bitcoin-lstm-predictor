@@ -525,91 +525,164 @@ def create_accuracy_trend_chart(tracker_data):
 
 
 # ==================== BACKTESTING SYSTEM ====================
+def fetch_binance_historical(start_date, end_date, symbol="BTCUSDT", interval="15m"):
+    """
+    Fetch historical OHLCV from Binance data-api with pagination.
+    Supports any historical date range — no 60-day yfinance limit.
+    Logic mirrors the Jupyter notebook approach exactly.
+    """
+    import requests as _req
+
+    url = "https://data-api.binance.vision/api/v3/klines"
+    start_milli   = int(pd.Timestamp(start_date).timestamp() * 1000)
+    end_milli     = int(pd.Timestamp(end_date).timestamp() * 1000)
+    current_start = start_milli
+    all_klines    = []
+
+    logger.info(f"Fetching Binance historical: {start_date} → {end_date}")
+
+    while current_start < end_milli:
+        params = {
+            "symbol":    symbol,
+            "interval":  interval,
+            "startTime": current_start,
+            "endTime":   end_milli,
+            "limit":     1000,
+        }
+        try:
+            resp = _req.get(url, params=params, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            logger.error(f"Binance API request failed: {e}")
+            break
+
+        if not data:
+            break
+
+        all_klines.extend(data)
+        current_start = data[-1][0] + 1  # advance to avoid duplicate candle
+
+    if not all_klines:
+        return None
+
+    cols = [
+        'OpenTime','Open','High','Low','Close','Volume',
+        'CloseTime','QuoteVolume','Trades','TakerBuyBase','TakerBuyQuote','Ignore'
+    ]
+    df = pd.DataFrame(all_klines, columns=cols)
+    df['OpenTime'] = pd.to_datetime(df['OpenTime'], unit='ms')
+    df.set_index('OpenTime', inplace=True)
+    for col in ['Open','High','Low','Close','Volume']:
+        df[col] = df[col].astype(float)
+
+    df = df[['Open','High','Low','Close','Volume']]
+    logger.info(f"Binance historical fetched: {len(df)} klines")
+    return df
+
+
 def run_backtest(start_date, end_date, model_v1, scaler_v1):
     """
-    Run backtesting on historical data.
+    Run backtesting using Binance API — no date-range restriction.
     Returns comprehensive metrics and prediction history.
     """
     try:
-        # Fetch historical data
-        ticker = yf.Ticker("BTC-USD")
-        df_hist = ticker.history(start=start_date, end=end_date, interval="15m")
-        
-        if df_hist.empty or len(df_hist) < 100:
-            return None, "Insufficient historical data for selected date range"
-        
-        # Calculate technical indicators
+        # --- Ambil data dari Binance (bukan yfinance, bebas batas tanggal) ---
+        df_hist = fetch_binance_historical(start_date, end_date)
+
+        if df_hist is None or df_hist.empty or len(df_hist) < 100:
+            return None, (
+                "Insufficient historical data for selected date range. "
+                "Pastikan koneksi internet aktif dan rentang tanggal memiliki cukup data."
+            )
+
+        logger.info(f"Backtest dataset: {len(df_hist)} rows "
+                    f"({df_hist.index[0]} → {df_hist.index[-1]})")
+
+        # Hitung indikator teknikal (tanpa @st.cache_data karena data lokal)
         df_full, df_model = calculate_technical_indicators(df_hist)
-        
-        # Initialize results
-        results = {
-            'predictions': [], 'directional_correct': 0, 'total': 0
-        }
-        
-        # Run predictions on each timestamp (skip last 1 to have actual price)
-        total_points = len(df_model) - 1
-        
-        for i in range(60, total_points): # Start from 60 to have enough history
-            try:
-                # Get data up to current point
-                df_subset = df_model.iloc[:i+1]
-                
-                # Prediction
-                pred, conf, _ = predict_next_price(df_subset, model_v1, scaler_v1)
-                
-                # Get actual price (next timestamp)
-                actual_price = df_hist['Close'].iloc[i+1]
-                current_price = df_hist['Close'].iloc[i]
-                
-                # Calculate errors
-                if pred:
-                    error = abs(pred - actual_price)
-                    direction = 'up' if pred > current_price else 'down'
-                    actual_direction = 'up' if actual_price > current_price else 'down'
-                    
-                    results['predictions'].append({
-                        'predicted': pred,
-                        'actual': actual_price,
-                        'error': error,
-                        'direction_correct': direction == actual_direction
-                    })
-                    
-                    if direction == actual_direction:
-                        results['directional_correct'] += 1
-                    results['total'] += 1
-                    
-            except Exception as e:
-                logger.warning(f"Backtest prediction failed at index {i}: {str(e)}")
-                continue
-        
-        # Calculate final metrics
+
+        if len(df_model) < 62:
+            return None, "Data setelah kalkulasi indikator tidak cukup (butuh minimal 62 baris)."
+
+        # ── VECTORIZED SLIDING WINDOW + BATCH PREDICTION ─────────────────
+        # Rename kolom agar cocok dengan nama kolom saat scaler di-fit
+        df_scaled_input = df_model.copy()
+        if len(df_scaled_input.columns) == 4:
+            df_scaled_input.columns = ['Close', 'RSI', 'MACD', 'MACD_Signal']
+
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            scaled_data = scaler_v1.transform(df_scaled_input)
+
+        time_step = 60
+        n_samples = len(scaled_data) - time_step
+
+        # Build seluruh sliding window sekaligus (tanpa loop) — O(1) overhead
+        idx = np.arange(time_step)[None, :] + np.arange(n_samples)[:, None]
+        X_all = scaled_data[idx]  # shape: (n_samples, 60, 4)
+
+        # Satu kali model.predict untuk semua sample — 40-100x lebih cepat
+        logger.info(f"Batched prediction: {n_samples} samples...")
+        pred_scaled = model_v1.predict(X_all, batch_size=512, verbose=0)
+
+        # Inverse-transform: hanya kolom Close (index 0)
+        dummy = np.zeros((len(pred_scaled), 4))
+        dummy[:, 0] = pred_scaled.flatten()
+        y_pred = scaler_v1.inverse_transform(dummy)[:, 0]
+
+        # ── HITUNG METRIK ─────────────────────────────────────────────────
+        results = {'predictions': [], 'directional_correct': 0, 'total': 0}
+
+        for i in range(n_samples):
+            # FIX: gunakan df_model (sudah dropna) bukan df_hist
+            # Ini menghilangkan bug alignment akibat warmup indikator teknikal
+            actual_price  = df_model['Close'].iloc[i + time_step]
+            current_price = df_model['Close'].iloc[i + time_step - 1]
+            pred          = float(y_pred[i])
+
+            error = abs(pred - actual_price)
+
+            # FIX: directional accuracy tanpa threshold — murni np.sign
+            direction        = 'up' if pred > current_price else 'down'
+            actual_direction = 'up' if actual_price > current_price else 'down'
+            is_correct       = direction == actual_direction
+
+            results['predictions'].append({
+                'predicted':         pred,
+                'actual':            actual_price,
+                'error':             error,
+                'direction_correct': is_correct,
+            })
+            if is_correct:
+                results['directional_correct'] += 1
+            results['total'] += 1
+
         metrics = {}
-        
-        preds = results['predictions']
-        if len(preds) > 0:
+        preds   = results['predictions']
+
+        if preds:
             errors = [p['error'] for p in preds]
-            
             metrics['v1'] = {
-                'total_predictions': len(preds),
+                'total_predictions':    len(preds),
                 'directional_accuracy': (results['directional_correct'] / results['total']) * 100,
-                'mae': np.mean(errors),
-                'rmse': np.sqrt(np.mean([e**2 for e in errors])),
-                'min_error': np.min(errors),
-                'max_error': np.max(errors),
-                'median_error': np.median(errors)
+                'mae':                  np.mean(errors),
+                'rmse':                 np.sqrt(np.mean([e**2 for e in errors])),
+                'min_error':            np.min(errors),
+                'max_error':            np.max(errors),
+                'median_error':         np.median(errors),
             }
         else:
             metrics['v1'] = None
-        
+
         return metrics, None
-        
-        logger.info(" Model V2 files downloaded successfully!")
-        return True
-        
+
     except Exception as e:
-        logger.error(f"Error downloading Model V2 files: {str(e)}")
-        logger.warning("Model V2 will not be available. Using V1 only.")
-        return False
+        logger.error(f"Backtest error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return None, str(e)
 
 # ==================== LOAD MODEL & SCALER ====================
 @st.cache_resource
@@ -800,7 +873,8 @@ def validate_data_for_prediction(df, min_rows=config.MIN_DATA_ROWS):
     return True, " Data valid untuk prediksi."
 
 # ==================== FEATURE ENGINEERING ====================
-@st.cache_data(ttl=config.CACHE_TTL_INDICATORS, show_spinner=False)
+@st.cache_data(ttl=config.CACHE_TTL_INDICATORS, show_spinner=False,
+               hash_funcs={pd.DataFrame: lambda df: df.to_json()})
 def calculate_technical_indicators(df):
     """
     Calculate technical indicators for LSTM model:
@@ -985,16 +1059,25 @@ def render_tradingview_widget():
 
 # ==================== LSTM PREDICTION ====================
 def predict_next_price(df_model, model, scaler, sequence_length=config.SEQUENCE_LENGTH):
-    logger.info(f"Starting LSTM prediction with sequence length: {sequence_length}")
+    logger.debug(f"Starting LSTM prediction with sequence length: {sequence_length}")
     
     if len(df_model) < sequence_length:
         logger.error(f"Insufficient data: {len(df_model)} rows (need {sequence_length})")
         st.error(f" Data insufficient! Need {sequence_length} rows.")
         return None, None, None
     
-    # Take last 60 rows
-    last_sequence = df_model.iloc[-sequence_length:].values
-    last_sequence_scaled = scaler.transform(last_sequence)
+    # Ambil 60 data terakhir dan ubah nama kolom untuk menghindari warning sklearn
+    import warnings
+    last_sequence_df = df_model.iloc[-sequence_length:].copy()
+    
+    # Fallback to safely renaming columns to what scaler expects
+    if len(last_sequence_df.columns) == 4:
+        last_sequence_df.columns = ['Close', 'RSI', 'MACD', 'MACD_Signal']
+        
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        last_sequence_scaled = scaler.transform(last_sequence_df)
+        
     X_input = last_sequence_scaled.reshape(1, sequence_length, 4)
     
     logger.debug(f"Input shape: {X_input.shape}")
@@ -1005,7 +1088,7 @@ def predict_next_price(df_model, model, scaler, sequence_length=config.SEQUENCE_
     dummy_array[0, 0] = prediction_scaled[0, 0]
     predicted_price = scaler.inverse_transform(dummy_array)[0, 0]
     
-    logger.info(f"Raw prediction: ${predicted_price:,.2f}")
+    logger.debug(f"Raw prediction: ${predicted_price:,.2f}")
     
     # Confidence Calculation (Standard deviation/Trend based)
     recent_prices = df_model['Close'].iloc[-10:].values
@@ -1017,7 +1100,7 @@ def predict_next_price(df_model, model, scaler, sequence_length=config.SEQUENCE_
     confidence = config.CONFIDENCE_BASE + (trend_consistency * config.CONFIDENCE_TREND_WEIGHT) - (volatility_factor * config.CONFIDENCE_VOLATILITY_WEIGHT)
     confidence = max(config.CONFIDENCE_MIN, min(config.CONFIDENCE_MAX, confidence))
     
-    logger.info(f"Confidence score: {confidence:.1f}% (volatility: {volatility:.2f}, trend: {trend_consistency:.2f})")
+    logger.debug(f"Confidence score: {confidence:.1f}% (volatility: {volatility:.2f}, trend: {trend_consistency:.2f})")
     
     current_price = df_model['Close'].iloc[-1]
     avg_move = np.mean(np.abs(price_changes))
@@ -1028,7 +1111,7 @@ def predict_next_price(df_model, model, scaler, sequence_length=config.SEQUENCE_
         'likely': (predicted_price * 0.7) + (current_price * 0.3)
     }
     
-    logger.info(f"Prediction complete: ${predicted_price:,.2f} (Confidence: {confidence:.1f}%)")
+    logger.debug(f"Prediction complete: ${predicted_price:,.2f} (Confidence: {confidence:.1f}%)")
     return predicted_price, confidence, scenarios
 
 def predict_next_price_v2(df_model, model, scaler, sequence_length=config.SEQUENCE_LENGTH):
@@ -1880,22 +1963,22 @@ def main():
             
             with gauge_col2:
                 # Confidence breakdown
-                st.markdown("**Confidence Breakdown:**")
+                st.markdown("Confidence Breakdown:")
                 st.markdown(f"""
-                - **Base Score:** 50%
-                - **Trend Consistency:** Contributes up to +30%
-                - **Volatility Penalty:** Up to -20%
+                - Base Score: 50%
+                - Trend Consistency: Contributes up to +30%
+                - Volatility Penalty: Up to -20%
                 """)
                 
                 st.caption(" Uses basic volatility calculation")
                 
                 # Confidence level indicator
                 if res['conf'] >= 70:
-                    st.success(" **HIGH CONFIDENCE** - Strong signal")
+                    st.success(" HIGH CONFIDENCE - Strong signal")
                 elif res['conf'] >= 55:
-                    st.warning(" **MEDIUM CONFIDENCE** - Moderate signal")
+                    st.warning(" MEDIUM CONFIDENCE - Moderate signal")
                 else:
-                    st.error(" **LOW CONFIDENCE** - Weak signal, use caution")
+                    st.error(" LOW CONFIDENCE - Weak signal, use caution")
             
 
             # --- Interpretation & Disclaimer ---
@@ -1911,20 +1994,20 @@ def main():
             
             # Interpretasi AI (Full Width)
             st.info(f"""
-            ** Interpretasi AI:** 
-            Berdasarkan analisis pola LSTM, model memprediksi bahwa dalam **15 menit ke depan** (sekitar pukul **{pred_time}**), 
-            harga Bitcoin berpotensi **{direction_text} {direction_emoji}** sebesar **{abs(res['pct']):.2f}%** menuju level **${res['price']:,.2f}**.
-            
-            **Tingkat Keyakinan (Confidence): {confidence_text} ({res['conf']:.1f}%)**
+            Interpretasi AI:
+            Berdasarkan analisis pola LSTM, model memprediksi bahwa dalam 15 menit ke depan (sekitar pukul {pred_time}),
+            harga Bitcoin berpotensi {direction_text} {direction_emoji} sebesar {abs(res['pct']):.2f}% menuju level ${res['price']:,.2f}.
+
+            Tingkat Keyakinan (Confidence): {confidence_text} ({res['conf']:.1f}%)
             """)
-            
+
             # Disclaimer (Full Width)
             st.warning("""
-            ** Disclaimer Penting:**
-            1. **Akurasi Model:** LSTM untuk timeframe 15 menit memiliki volatilitas tinggi (akurasi estimasi 55-65%).
-            2. **Data Input:** Prediksi ini murni berdasarkan pola historis **60 candle terakhir** (15 jam ke belakang).
-            3. **Faktor Eksternal:** Market crypto sangat dipengaruhi news/event global yang tidak bisa dilihat oleh model ini.
-            4. **Bukan Nasihat Finansial:** Gunakan data ini sebagai referensi pendukung keputusan, bukan acuan tunggal.
+            Disclaimer Penting:
+            1. Akurasi Model: LSTM untuk timeframe 15 menit memiliki volatilitas tinggi (akurasi estimasi 55-65%).
+            2. Data Input: Prediksi ini murni berdasarkan pola historis 60 candle terakhir (15 jam ke belakang).
+            3. Faktor Eksternal: Market crypto sangat dipengaruhi news/event global yang tidak bisa dilihat oleh model ini.
+            4. Bukan Nasihat Finansial: Gunakan data ini sebagai referensi pendukung keputusan, bukan acuan tunggal.
             """)
             
             # Pattern Visualizer (Full Width, Larger)
@@ -1954,7 +2037,7 @@ def main():
             verified = len([p for p in tracker.get('predictions', []) if p.get('actual_price') is not None])
             
             st.info(f"""
-            ** Trend Insights:**
+            Trend Insights:
             - Chart shows how accuracy evolves as more predictions are verified
             - {verified} verified predictions
             - Look for upward trends in directional accuracy and downward trends in MAE/RMSE
@@ -1986,7 +2069,7 @@ def main():
         
         # Insights
         st.info("""
-        ** Backtest Insights:**
+        Backtest Insights:
         - Results based on historical data (past performance)
         - Large sample size provides statistical significance
         - Use these metrics to validate model performance
