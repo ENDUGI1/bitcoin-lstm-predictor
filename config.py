@@ -67,12 +67,24 @@ MAIN_CHART_HEIGHT = 700  # Main chart height in pixels
 PATTERN_CHART_HEIGHT = 500  # Pattern chart height in pixels
 CHART_CANDLES_DISPLAY = 100  # Number of candles to display in main chart
 
-# Color Scheme (Cyberpunk Theme)
-COLOR_PRIMARY = "#00D9FF"  # Cyan
-COLOR_SECONDARY = "#BD00FF"  # Purple
-COLOR_SUCCESS = "#00FF88"  # Green
-COLOR_DANGER = "#FF3B69"  # Red
-COLOR_WARNING = "#FF9900"  # Orange
+# Color Scheme — Quiet Quant design system (Linear/Vercel-inspired restraint)
+# Single accent + desaturated direction tints. Authoritative source is styles.TOKENS.
+COLOR_ACCENT      = "#E07856"  # Clay — single accent (CTA, focus, live)
+COLOR_TEXT        = "#F1EFEC"  # Cream paper text
+COLOR_TEXT_MUTED  = "#7D8088"  # Slate muted
+COLOR_SURFACE     = "#0F1011"  # App base
+COLOR_ELEVATED    = "#16181B"  # Card surface
+COLOR_UP          = "#9DA59E"  # Direction up (slate-sage)
+COLOR_DOWN        = "#A39189"  # Direction down (slate-clay)
+COLOR_WARNING_NEW = "#C9A06E"  # Warm warning
+
+# Legacy aliases — kept so any existing reference still resolves.
+# Mapped onto the new palette; do NOT use these in new code.
+COLOR_PRIMARY   = COLOR_ACCENT
+COLOR_SECONDARY = COLOR_TEXT_MUTED
+COLOR_SUCCESS   = COLOR_UP
+COLOR_DANGER    = COLOR_DOWN
+COLOR_WARNING   = COLOR_WARNING_NEW
 
 # ==================== CONFIDENCE SCORING ====================
 # Confidence Calculation Parameters

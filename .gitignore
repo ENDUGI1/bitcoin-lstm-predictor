@@ -54,3 +54,7 @@ tracker_data.json
 
 # Debug scripts
 debug_*.py
+
+# Claude Code tooling (local AI-agent skills + lockfile — not source)
+.agents/
+skills-lock.json

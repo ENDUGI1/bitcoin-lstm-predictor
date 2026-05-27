@@ -15,6 +15,10 @@ import os
 # Import configuration
 import config
 
+# Design system (Quiet Quant — see styles.py)
+import styles
+from styles import TOKENS, PLOTLY_THEME, PLOTLY_AXIS, ICONS
+
 # ==================== LOGGING SETUP ====================
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL),
@@ -74,178 +78,11 @@ def calculate_macd(series, fast=12, slow=26, signal=9):
     histogram = macd_line - signal_line
     return macd_line, signal_line, histogram
 
-# ==================== CUSTOM CSS (CYBERPUNK STYLE) ====================
+# ==================== CUSTOM CSS — QUIET QUANT DESIGN SYSTEM ====================
+# All styling lives in styles.py (tokens, CSS, Plotly theme, SVG icons, helpers).
+# This wrapper keeps the original API stable; the implementation is delegated.
 def inject_custom_css():
-    st.markdown("""
-        <style>
-        /* Import Google Fonts */
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;500;700&family=JetBrains+Mono:wght@400;700&display=swap');
-
-        /* --- GLOBAL VARIABLES --- */
-        :root {
-            --primary-color: #00D9FF;
-            --secondary-color: #BD00FF;
-            --success-color: #00FF88;
-            --danger-color: #FF3B69;
-            --bg-color: #0E1117;
-            --card-bg: rgba(18, 22, 31, 0.7);
-            --card-border: 1px solid rgba(255, 255, 255, 0.08);
-            --glass-effect: blur(12px);
-        }
-
-        /* --- TYPOGRAPHY --- */
-        html, body, [class*="css"] {
-            font-family: 'Rajdhani', sans-serif !important;
-            letter-spacing: 0.5px;
-        }
-
-        h1, h2, h3 {
-            font-family: 'Orbitron', sans-serif !important;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            background: linear-gradient(135deg, #FFF 0%, var(--primary-color) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 0 30px rgba(0, 217, 255, 0.2);
-        }
-
-        /* --- MAIN CONTAINER --- */
-        .stApp {
-            background-color: var(--bg-color);
-            background-image: 
-                radial-gradient(circle at 10% 20%, rgba(189, 0, 255, 0.05) 0%, transparent 20%),
-                radial-gradient(circle at 90% 80%, rgba(0, 217, 255, 0.05) 0%, transparent 20%);
-        }
-
-        /* --- METRICS CARDS ('stMetric') --- */
-        div[data-testid="stMetric"] {
-            background: var(--card-bg);
-            border: var(--card-border);
-            border-radius: 16px;
-            padding: 20px;
-            backdrop-filter: var(--glass-effect);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-        }
-
-        div[data-testid="stMetric"]::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 2px;
-            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
-            opacity: 0.5;
-        }
-
-        div[data-testid="stMetric"]:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0, 217, 255, 0.15);
-            border-color: rgba(0, 217, 255, 0.3);
-        }
-
-        div[data-testid="stMetricLabel"] {
-            font-size: 0.9rem !important;
-            color: #8899A6 !important;
-            font-family: 'Orbitron', sans-serif;
-            letter-spacing: 1px;
-        }
-
-        div[data-testid="stMetricValue"] {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 2.2rem !important;
-            font-weight: 700;
-            color: #FFF !important;
-            text-shadow: 0 0 10px rgba(255,255,255,0.1);
-        }
-
-        div[data-testid="stMetricDelta"] {
-            font-family: 'JetBrains Mono', monospace;
-            background: rgba(0,0,0,0.3);
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 0.8rem !important;
-        }
-
-        /* --- EXPANDERS & CONTAINERS --- */
-        div[data-testid="stExpander"] {
-            background: transparent;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-        }
-        
-        div[data-testid="stExpander"]:hover {
-            border-color: var(--primary-color);
-        }
-
-        /* --- BUTTONS --- */
-        div.stButton > button {
-            background: linear-gradient(135deg, rgba(0, 217, 255, 0.1) 0%, rgba(189, 0, 255, 0.1) 100%);
-            border: 1px solid rgba(0, 217, 255, 0.5);
-            color: #FFF;
-            font-family: 'Orbitron', sans-serif;
-            letter-spacing: 2px;
-            border-radius: 8px;
-            padding: 0.75rem 2rem;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-        }
-
-        div.stButton > button:hover {
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            border-color: transparent;
-            box-shadow: 0 0 20px rgba(0, 217, 255, 0.4);
-            transform: scale(1.02);
-        }
-
-        div.stButton > button:active {
-            transform: scale(0.98);
-        }
-
-        /* --- SIDEBAR --- */
-        section[data-testid="stSidebar"] {
-            background-color: #050505;
-            border-right: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        
-        section[data-testid="stSidebar"] h1 {
-            background: none;
-            -webkit-text-fill-color: #FFF;
-            font-size: 1.2rem;
-            letter-spacing: 1px;
-            text-shadow: none;
-        }
-
-        /* --- ALERTS (INFO, SUCCESS, WARNING) --- */
-        div[data-testid="stAlert"] {
-            border-radius: 12px;
-            background: rgba(18, 22, 31, 0.8);
-            border: 1px solid rgba(255,255,255,0.1);
-            backdrop-filter: blur(10px);
-        }
-
-        /* --- PLOTLY CHARTS --- */
-        .js-plotly-plot .plotly .main-svg {
-            background: transparent !important;
-        }
-        
-        /* --- GAMING/FUTURISTIC SCROLLBAR --- */
-        ::-webkit-scrollbar {
-            width: 10px;
-            height: 10px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0E1117; 
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #333; 
-            border-radius: 5px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--primary-color); 
-        }
-        </style>
-    """, unsafe_allow_html=True)
+    styles.inject()
 
 inject_custom_css()
 
@@ -353,41 +190,62 @@ def calculate_accuracy_metrics(predictions_list):
 
 def create_confidence_gauge(confidence, title="Confidence"):
     """
-    Create a Plotly gauge chart for confidence visualization.
+    Confidence gauge (Quiet Quant theme).
+    - Bar uses the single accent (clay) so it reads as a *signal*, not a separate color.
+    - Steps are desaturated direction tints (down / warning / up) — no neon red/green.
+    - Threshold marker removed: redundant with the bar value itself.
     """
+    # Pick the active segment color so the bar always reads as the dominant tone
+    if confidence >= 70:
+        bar_color = TOKENS["up"]
+    elif confidence >= 55:
+        bar_color = TOKENS["warning"]
+    else:
+        bar_color = TOKENS["down"]
+
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=confidence,
         domain={'x': [0, 1], 'y': [0, 1]},
-        title={'text': title, 'font': {'size': 16, 'color': '#E0E0E0'}},
-        number={'suffix': "%", 'font': {'size': 32, 'color': '#FFF'}},
+        title={
+            'text': title,
+            'font': {'size': 12, 'color': TOKENS["text_muted"],
+                     'family': "Manrope, sans-serif"},
+        },
+        number={
+            'suffix': "%",
+            'font': {'size': 36, 'color': TOKENS["text_primary"],
+                     'family': "JetBrains Mono, monospace"},
+            'valueformat': '.0f',
+        },
         gauge={
-            'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "#888"},
-            'bar': {'color': "#00D9FF"},
-            'bgcolor': "rgba(0,0,0,0)",
-            'borderwidth': 2,
-            'bordercolor': "#333",
+            'axis': {
+                'range': [0, 100],
+                'tickwidth': 1,
+                'tickcolor': TOKENS["text_faint"],
+                'tickfont': {'family': 'JetBrains Mono, monospace', 'size': 10,
+                             'color': TOKENS["text_muted"]},
+                'tickvals': [0, 25, 50, 75, 100],
+            },
+            'bar': {'color': bar_color, 'thickness': 0.28},
+            'bgcolor': 'rgba(0,0,0,0)',
+            'borderwidth': 0,
+            'bordercolor': 'rgba(0,0,0,0)',
             'steps': [
-                {'range': [0, 55], 'color': 'rgba(255, 59, 105, 0.3)'}, # Red - Low
-                {'range': [55, 70], 'color': 'rgba(255, 153, 0, 0.3)'}, # Orange - Medium
-                {'range': [70, 100], 'color': 'rgba(0, 255, 136, 0.3)'} # Green - High
+                {'range': [0, 55],   'color': TOKENS["down_soft"]},
+                {'range': [55, 70],  'color': TOKENS["warning_soft"]},
+                {'range': [70, 100], 'color': TOKENS["up_soft"]},
             ],
-            'threshold': {
-                'line': {'color': "#BD00FF", 'width': 4},
-                'thickness': 0.75,
-                'value': confidence
-            }
         }
     ))
-    
+
     fig.update_layout(
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
-        font={'color': "#E0E0E0"},
-        height=250,
-        margin=dict(l=20, r=20, t=50, b=20)
+        font={'color': TOKENS["text_primary"], 'family': "Manrope, sans-serif"},
+        height=220,
+        margin=dict(l=20, r=20, t=40, b=20),
     )
-    
     return fig
 
 
@@ -468,59 +326,79 @@ def create_accuracy_trend_chart(tracker_data):
         
         return counts, dir_acc, mae_vals, rmse_vals
     
-    # Create subplots
+    # Three stacked panels — sequential, low-density. Subtitles use eyebrow-style caps.
     fig = make_subplots(
         rows=3, cols=1,
-        subplot_titles=('Directional Accuracy Over Time', 'MAE Over Time', 'RMSE Over Time'),
-        vertical_spacing=0.1,
-        row_heights=[0.33, 0.33, 0.33]
+        subplot_titles=('DIRECTIONAL ACCURACY', 'MEAN ABSOLUTE ERROR', 'ROOT MEAN SQUARE ERROR'),
+        vertical_spacing=0.12,
+        row_heights=[0.34, 0.33, 0.33]
     )
-    
+
     if len(preds) >= 2:
         counts, dir_vals, mae_vals, rmse_vals = calc_cumulative_metrics(preds)
-        
-        # Directional accuracy
+
+        # All three use the same accent — restraint. Marker only at last point.
+        marker_emphasis = dict(size=6, color=TOKENS["accent"],
+                               line=dict(color=TOKENS["surface_base"], width=1))
+
         fig.add_trace(go.Scatter(
             x=counts, y=dir_vals,
             name='Directional Accuracy',
-            line=dict(color='#00D9FF', width=2),
-            mode='lines+markers'
+            line=dict(color=TOKENS["accent"], width=1.6),
+            mode='lines',
+            showlegend=False,
+            hovertemplate='<b>%{y:.1f}%</b> · n=%{x}<extra></extra>',
         ), row=1, col=1)
-        
-        # MAE
+
         fig.add_trace(go.Scatter(
-            x=counts, y=mae_vals,
-            name='MAE',
-            line=dict(color='#00D9FF', width=2),
-            mode='lines+markers',
-            showlegend=False
+            x=[counts[-1]], y=[dir_vals[-1]],
+            mode='markers', marker=marker_emphasis, showlegend=False,
+            hoverinfo='skip',
+        ), row=1, col=1)
+
+        fig.add_trace(go.Scatter(
+            x=counts, y=mae_vals, name='MAE',
+            line=dict(color=TOKENS["text_secondary"], width=1.4),
+            mode='lines', showlegend=False,
+            hovertemplate='<b>$%{y:,.2f}</b> · n=%{x}<extra></extra>',
         ), row=2, col=1)
-        
-        # RMSE
         fig.add_trace(go.Scatter(
-            x=counts, y=rmse_vals,
-            name='RMSE',
-            line=dict(color='#00D9FF', width=2),
-            mode='lines+markers',
-            showlegend=False
+            x=[counts[-1]], y=[mae_vals[-1]],
+            mode='markers', marker=marker_emphasis, showlegend=False, hoverinfo='skip',
+        ), row=2, col=1)
+
+        fig.add_trace(go.Scatter(
+            x=counts, y=rmse_vals, name='RMSE',
+            line=dict(color=TOKENS["text_secondary"], width=1.4),
+            mode='lines', showlegend=False,
+            hovertemplate='<b>$%{y:,.2f}</b> · n=%{x}<extra></extra>',
         ), row=3, col=1)
-    
-    # Update layout
-    fig.update_xaxes(title_text="Number of Predictions", row=3, col=1)
-    fig.update_yaxes(title_text="Accuracy (%)", row=1, col=1)
-    fig.update_yaxes(title_text="MAE ($)", row=2, col=1)
-    fig.update_yaxes(title_text="RMSE ($)", row=3, col=1)
-    
-    fig.update_layout(
-        height=800,
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#E0E0E0'),
-        hovermode='x unified',
-        showlegend=True,
-        legend=dict(orientation="h", y=1.08, x=0.5, xanchor="center")
+        fig.add_trace(go.Scatter(
+            x=[counts[-1]], y=[rmse_vals[-1]],
+            mode='markers', marker=marker_emphasis, showlegend=False, hoverinfo='skip',
+        ), row=3, col=1)
+
+    # Apply shared axis style to every subplot
+    for r in (1, 2, 3):
+        fig.update_xaxes(**PLOTLY_AXIS, row=r, col=1)
+        fig.update_yaxes(**PLOTLY_AXIS, row=r, col=1)
+
+    fig.update_xaxes(title_text="Predictions verified", row=3, col=1)
+    fig.update_yaxes(title_text="Accuracy %",  row=1, col=1, ticksuffix="%")
+    fig.update_yaxes(title_text="USD", row=2, col=1, tickprefix="$")
+    fig.update_yaxes(title_text="USD", row=3, col=1, tickprefix="$")
+
+    # Subtitle styling — eyebrow caps in muted mono
+    fig.update_annotations(
+        font=dict(family="JetBrains Mono, monospace", size=10, color=TOKENS["text_muted"]),
+        xanchor='left', x=0,
     )
-    
+
+    fig.update_layout(
+        **PLOTLY_THEME,
+        height=620,
+        showlegend=False,
+    )
     return fig
 
 
@@ -724,7 +602,9 @@ def get_binance_btc_data():
                 "limit": config.BINANCE_LIMIT
             }
             
-            response = requests.get(url, params=params, timeout=15)
+            # 6s timeout — long enough for slow connections, short enough to fail
+            # fast and fall through to yfinance instead of hanging the whole render.
+            response = requests.get(url, params=params, timeout=6)
             response.raise_for_status()
             data = response.json()
             
@@ -1236,47 +1116,48 @@ def create_pattern_chart(df_features, sequence_length=60):
     Visualisasi 60 candle terakhir yang digunakan model untuk prediksi.
     Menampilkan pola yang "dilihat" oleh LSTM.
     """
-    # Ambil 60 candle terakhir
+    # The 60 candles the model "sees" before predicting the next bar.
     pattern_data = df_features.iloc[-sequence_length:].copy()
-    
+    x_idx = list(range(len(pattern_data)))
+
     fig = go.Figure()
-    
-    # Plot harga Close
+
+    # 1. Main line — muted secondary text color, thin. The data tells the story.
     fig.add_trace(go.Scatter(
-        x=list(range(len(pattern_data))),
-        y=pattern_data['Close'],
-        mode='lines+markers',
-        name='Close Price',
-        line=dict(color='#00D9FF', width=3),
-        marker=dict(size=5)
+        x=x_idx, y=pattern_data['Close'],
+        mode='lines',
+        name='Close price',
+        line=dict(color=TOKENS["text_secondary"], width=1.6),
+        hovertemplate='Candle %{x} · <b>$%{y:,.2f}</b><extra></extra>',
     ))
-    
-    # Highlight 10 candle terakhir (paling berpengaruh)
-    last_10 = pattern_data.iloc[-10:]
+
+    # 2. Highlight last 10 — accent (clay). The "recent" zone that drives the forecast.
+    last_10_x = list(range(len(pattern_data) - 10, len(pattern_data)))
     fig.add_trace(go.Scatter(
-        x=list(range(len(pattern_data)-10, len(pattern_data))),
-        y=last_10['Close'],
+        x=last_10_x, y=pattern_data['Close'].iloc[-10:],
+        mode='lines',
+        name='Most recent 10 candles',
+        line=dict(color=TOKENS["accent"], width=2.2),
+        hovertemplate='Candle %{x} · <b>$%{y:,.2f}</b><extra></extra>',
+    ))
+
+    # 3. Single marker on the current (latest) candle so the "now" point is clear.
+    fig.add_trace(go.Scatter(
+        x=[x_idx[-1]], y=[pattern_data['Close'].iloc[-1]],
         mode='markers',
-        name='Recent Trend (Most Important)',
-        marker=dict(size=10, color='#FF6B6B', symbol='circle')
+        marker=dict(size=8, color=TOKENS["accent"],
+                    line=dict(color=TOKENS["surface_base"], width=2)),
+        showlegend=False, hoverinfo='skip',
     ))
-    
+
     fig.update_layout(
-        xaxis_title="Candle Index (0 = Oldest, 59 = Current)",
+        **PLOTLY_THEME,
+        height=420,
+        xaxis_title="Candle index  ·  0 = oldest, 59 = current",
         yaxis_title="Price (USD)",
-        height=500, # Increased from 350 to 500
-        hovermode='x unified',
-        showlegend=True,
-        plot_bgcolor='rgba(0,0,0,0.05)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#E0E0E0', size=12),
-        margin=dict(l=50, r=50, t=20, b=50)
     )
-    
-    # Add grid for better readability
-    fig.update_xaxes(showgrid=True, gridcolor='rgba(255,255,255,0.1)')
-    fig.update_yaxes(showgrid=True, gridcolor='rgba(255,255,255,0.1)')
-    
+    fig.update_xaxes(**PLOTLY_AXIS)
+    fig.update_yaxes(**PLOTLY_AXIS, tickprefix="$")
     return fig
 
 # ==================== VISUALISASI CHART UTAMA ====================
@@ -1284,112 +1165,142 @@ def create_main_chart(df, df_features):
     # Slice last 100 candles
     df_viz = df.iloc[-100:]
     df_feat = df_features.iloc[-100:]
-    
+
     from plotly.subplots import make_subplots
-    
-    # Create Subplots: Price, RSI, MACD
+
+    # 3 stacked panels: price (dominant) → RSI → MACD.
+    # Subtitles styled as eyebrow caps (handled by update_annotations below).
     fig = make_subplots(
         rows=3, cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.04,
-        row_heights=[0.4, 0.3, 0.3],
-        subplot_titles=('Price Action', 'RSI (14)', 'MACD (12,26,9)')
+        vertical_spacing=0.045,
+        row_heights=[0.52, 0.24, 0.24],
+        subplot_titles=('PRICE  ·  15M CANDLES', 'RSI 14', 'MACD 12·26·9'),
     )
-    
-    # 1. Candlestick
+
+    # 1. CANDLESTICK — desaturated direction tints, no wick noise.
     fig.add_trace(go.Candlestick(
         x=df_viz.index,
-        open=df_viz['Open'], high=df_viz['High'], low=df_viz['Low'], close=df_viz['Close'],
-        name='Bitcoin',
-        increasing_line_color='#00FF88', decreasing_line_color='#FF3B69'
+        open=df_viz['Open'], high=df_viz['High'],
+        low=df_viz['Low'],  close=df_viz['Close'],
+        name='BTC/USDT',
+        increasing=dict(line=dict(color=TOKENS["up"],   width=1),
+                        fillcolor=TOKENS["up"]),
+        decreasing=dict(line=dict(color=TOKENS["down"], width=1),
+                        fillcolor=TOKENS["down"]),
+        showlegend=False,
     ), row=1, col=1)
-    
-    # 2. RSI
+
+    # 2. RSI line — muted secondary, thin. Threshold guides are dashed faint lines.
     fig.add_trace(go.Scatter(
         x=df_feat.index, y=df_feat['RSI_14'],
         name='RSI',
-        line=dict(color='#BD00FF', width=2)
+        line=dict(color=TOKENS["text_secondary"], width=1.4),
+        hovertemplate='RSI <b>%{y:.1f}</b><extra></extra>',
+        showlegend=False,
     ), row=2, col=1)
-    
-    # RSI Levels
-    fig.add_hline(y=70, line_dash="dash", line_color="rgba(255, 59, 105, 0.5)", row=2, col=1)
-    fig.add_hline(y=30, line_dash="dash", line_color="rgba(0, 255, 136, 0.5)", row=2, col=1)
-    
-    # 3. MACD with Histogram
+
+    fig.add_hline(y=70, line_dash="dot", line_width=1,
+                  line_color="rgba(163,145,137,0.45)", row=2, col=1)
+    fig.add_hline(y=30, line_dash="dot", line_width=1,
+                  line_color="rgba(157,165,158,0.45)", row=2, col=1)
+    fig.add_hline(y=50, line_dash="dot", line_width=1,
+                  line_color="rgba(241,239,236,0.06)", row=2, col=1)
+
+    # 3. MACD — histogram (direction tint), MACD line (accent), signal (faint).
     histogram = df_feat['MACD_12_26_9'] - df_feat['MACDs_12_26_9']
-    
-    # MACD Histogram (Bar Chart)
-    colors = ['#00FF88' if val >= 0 else '#FF3B69' for val in histogram]
+    hist_colors = [TOKENS["up"] if v >= 0 else TOKENS["down"] for v in histogram]
     fig.add_trace(go.Bar(
         x=df_feat.index, y=histogram,
         name='Histogram',
-        marker_color=colors,
-        opacity=0.5
+        marker_color=hist_colors,
+        opacity=0.55,
+        hovertemplate='Histogram <b>%{y:.2f}</b><extra></extra>',
+        showlegend=False,
     ), row=3, col=1)
-    
-    # MACD Line
     fig.add_trace(go.Scatter(
         x=df_feat.index, y=df_feat['MACD_12_26_9'],
         name='MACD',
-        line=dict(color='#00D9FF', width=2)
+        line=dict(color=TOKENS["accent"], width=1.6),
+        hovertemplate='MACD <b>%{y:.2f}</b><extra></extra>',
     ), row=3, col=1)
-    
-    # Signal Line
     fig.add_trace(go.Scatter(
         x=df_feat.index, y=df_feat['MACDs_12_26_9'],
         name='Signal',
-        line=dict(color='#FF9900', width=2)
+        line=dict(color=TOKENS["text_secondary"], width=1.2, dash='dot'),
+        hovertemplate='Signal <b>%{y:.2f}</b><extra></extra>',
     ), row=3, col=1)
-    
-    fig.update_layout(
-        height=700,
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        xaxis=dict(showgrid=False, color='#888'),
-        yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.05)', color='#888'),
-        legend=dict(orientation="h", y=1.02, x=0.5, xanchor="center"),
-        margin=dict(l=20, r=20, t=60, b=20),
-        hovermode='x unified'
+
+    # Apply shared axis style to all subplots
+    for r in (1, 2, 3):
+        fig.update_xaxes(**PLOTLY_AXIS, row=r, col=1)
+        fig.update_yaxes(**PLOTLY_AXIS, row=r, col=1)
+
+    # Y-axis formatting per panel
+    fig.update_yaxes(tickprefix="$", row=1, col=1)
+    fig.update_yaxes(range=[0, 100], row=2, col=1)
+
+    # Hide weekend gaps? BTC trades 24/7, so leave x as-is.
+
+    # Subtitle annotations — eyebrow caps aligned left
+    fig.update_annotations(
+        font=dict(family="JetBrains Mono, monospace", size=10, color=TOKENS["text_muted"]),
+        xanchor='left', x=0,
     )
-    
+
+    # Disable Plotly's built-in range slider (visual clutter for our minimal frame)
+    fig.update_layout(xaxis_rangeslider_visible=False)
+
+    # Build a layout override that includes a chart-specific legend (overrides theme default)
+    main_chart_layout = {
+        **PLOTLY_THEME,
+        "height": 640,
+        "showlegend": True,
+        "legend": dict(orientation="h", y=-0.08, x=0.5, xanchor="center",
+                       bgcolor="rgba(0,0,0,0)",
+                       font=dict(family="JetBrains Mono, monospace",
+                                 size=10, color=TOKENS["text_muted"])),
+    }
+    fig.update_layout(**main_chart_layout)
     return fig
 
 # ==================== MAIN APP LAYOUT ====================
 def main():
     # --- Sidebar ---
     with st.sidebar:
-        # Rotating Logo in Sidebar
+        # Compact brand block — small static logo, eyebrow caps, no spin/dance.
         logo_b64 = get_bitcoin_logo_base64()
         st.markdown(f"""
-            <div style="display: flex; justify-content: center; margin-bottom: 20px;">
-                <img src="data:image/svg+xml;base64,{logo_b64}" 
-                     style="width: 120px; height: 120px; animation: spin 4s linear infinite;">
+            <div style="display:flex; align-items:center; gap:12px;
+                        padding:4px 0 24px 0;">
+                <img src="data:image/svg+xml;base64,{logo_b64}"
+                     alt="Bitcoin"
+                     style="width:28px; height:28px; opacity:0.95;" />
+                <div style="font-family:'JetBrains Mono', monospace; font-size:11px;
+                            letter-spacing:0.18em; text-transform:uppercase;
+                            color:var(--qq-text-muted); line-height:1.4;">
+                    BTC · LSTM<br/>
+                    <span style="color:var(--qq-text-faint);">Predictor</span>
+                </div>
             </div>
-            <style>
-                @keyframes spin {{ 
-                    from {{ transform: rotate(0deg); }} 
-                    to {{ transform: rotate(360deg); }} 
-                }}
-            </style>
         """, unsafe_allow_html=True)
-        
-        st.title("DASHBOARD")
-        st.info("**Algoritma:** LSTM\n**Indikator:** RSI & MACD")
-        
-        st.write("---")
-        
-        # Model Info
-        st.subheader(" Model Info")
-        st.markdown("""
-        **Architecture:** LSTM (60 timesteps) 
-        **Features (4):** Close, RSI, MACD, Signal 
-        **Prediction Horizon:** 15 Minutes 
-        """)
 
-        st.write("---")
+        # Model meta — terse, mono labels
+        st.markdown(f"""
+            <div class="qq-eyebrow" style="margin-bottom:8px;">Model</div>
+            <div style="font-family:var(--qq-font-mono); font-size:12px;
+                        color:var(--qq-text-secondary); line-height:1.85;">
+                <div>LSTM · 60 timesteps</div>
+                <div>4 features · Close, RSI, MACD, Signal</div>
+                <div>Horizon · 15m</div>
+            </div>
+        """, unsafe_allow_html=True)
 
-        # Model Performance Tracker
-        st.subheader(" Model Performance")
+        st.markdown("<hr/>", unsafe_allow_html=True)
+
+        # Performance section
+        st.markdown('<div class="qq-eyebrow">Performance</div>',
+                    unsafe_allow_html=True)
         
         # Initialize performance tracking in session state from persistent storage
         if 'performance_tracker' not in st.session_state:
@@ -1406,45 +1317,53 @@ def main():
             
             # Display performance with enhanced metrics
             if metrics:
-                st.metric("Directional Accuracy", f"{metrics['directional_accuracy']:.1f}%")
-                st.caption(f"MAE: ${metrics['mae']:.2f}")
-                st.caption(f"RMSE: ${metrics['rmse']:.2f}")
-                st.caption(f" {metrics['total_predictions']} verified")
+                st.metric("Directional accuracy", f"{metrics['directional_accuracy']:.1f}%")
+                st.caption(f"MAE  ${metrics['mae']:,.2f}")
+                st.caption(f"RMSE ${metrics['rmse']:,.2f}")
+                st.caption(f"{metrics['total_predictions']} verified")
             else:
                 st.metric("Accuracy", f"{accuracy:.1f}%")
-                st.caption(f" {len(tracker['predictions'])} predictions")
+                st.caption(f"{len(tracker['predictions'])} predictions")
                 st.caption("Awaiting actual prices")
-            
+
             # Reset button
-            if st.button("Reset Tracker", use_container_width=True):
+            if st.button("Reset tracker", use_container_width=True):
                 # Delete JSON file
                 if os.path.exists(TRACKER_FILE):
                     os.remove(TRACKER_FILE)
                     logger.info("Tracker data file deleted")
-                
+
                 # Reset session state
                 st.session_state['performance_tracker'] = {
                     'predictions': [],
                     'correct': 0,
                     'last_actual_price': None
                 }
-                st.success(" Tracker reset successfully!")
+                st.success("Tracker cleared.")
                 st.rerun()
-            
+
             # Manual Update Actual Prices Button
             st.write("---")
-            if st.button("Update Actual Prices", use_container_width=True, help="Manually update all predictions with current price for testing"):
+            if st.button("Update actual prices", use_container_width=True, help="Manually update all predictions with current price for testing"):
                 st.session_state['trigger_manual_update'] = True
                 st.rerun()
 
         else:
-            st.info(" Run predictions to start tracking performance!")
-        
+            # Elegant empty state — explains what triggers the metric
+            st.markdown("""
+                <div style="padding:14px 16px; border:1px dashed var(--qq-border-default);
+                            border-radius:var(--qq-radius-md);
+                            color:var(--qq-text-muted); font-size:12.5px; line-height:1.55;">
+                    Run a prediction to start tracking.<br/>
+                    Each forecast is matched against the actual close after 15 minutes.
+                </div>
+            """, unsafe_allow_html=True)
+
         # Prediction History & Error Analysis
         if len(tracker.get('predictions', [])) > 0:
             st.write("---")
-            with st.expander(" Prediction History & Errors", expanded=False):
-                st.caption("View individual prediction errors and identify outliers")
+            with st.expander("History · last 10 predictions", expanded=False):
+                st.caption("Individual errors with outlier flag (>2σ)")
                 
                 pred_data = []
                 for i, pred in enumerate(tracker['predictions'][-10:], 1): # Last 10
@@ -1471,16 +1390,16 @@ def main():
                         std_error = np.std(errors)
                         outliers = [i+1 for i, e in enumerate(errors) if abs(e - mean_error) > 2 * std_error]
                         if outliers:
-                            st.warning(f" Outliers detected: #{', #'.join(map(str, outliers))}")
+                            st.warning(f"Outliers flagged: #{', #'.join(map(str, outliers))}")
                 else:
                     st.caption("No verified predictions yet")
 
         st.write("---")
-        st.subheader(" Settings")
-        
-        # Backtesting Section (NEW!)
-        with st.expander(" Backtesting Dashboard", expanded=False):
-            st.caption("Test models on historical data")
+        st.markdown('<div class="qq-eyebrow">Tools</div>', unsafe_allow_html=True)
+
+        # Backtesting Section
+        with st.expander("Backtest on historical range", expanded=False):
+            st.caption("Replay the model over past 15-minute candles")
             
             # Date range selector
             col_date1, col_date2 = st.columns(2)
@@ -1498,77 +1417,77 @@ def main():
                 )
             
             # Run backtest button
-            if st.button(" Run Backtest", use_container_width=True):
+            if st.button("Run backtest", use_container_width=True):
                 if start_date >= end_date:
-                    st.error(" Start date must be before end date")
+                    st.error("Start date must be before end date.")
                 else:
-                    with st.spinner(" Running backtest... This may take a few minutes..."):
+                    with st.spinner("Running backtest…"):
                         metrics, error = run_backtest(
                             start_date, end_date,
                             model, scaler
                         )
-                        
+
                         if error:
-                            st.error(f" Backtest failed: {error}")
+                            st.error(f"Backtest failed: {error}")
                         elif metrics:
                             st.session_state['backtest_results'] = metrics
-                            st.success(" Backtest complete! Scroll down to see results.")
+                            st.success("Backtest complete.")
                             st.rerun()
                         else:
-                            st.error(" No results generated")
-        
+                            st.error("No results generated.")
 
         # Force Refresh Button
-        if st.button("Force Refresh Data", use_container_width=True):
+        if st.button("Force refresh data", use_container_width=True):
             st.cache_data.clear()
-            st.success(" Cache cleared! Reloading fresh data...")
+            st.success("Cache cleared. Reloading fresh data…")
             st.rerun()
-        
+
         # Telegram Alert Settings
         st.write("---")
-        st.subheader(" Telegram Alerts")
-        
+        st.markdown('<div class="qq-eyebrow">Alerts</div>', unsafe_allow_html=True)
+
         # Bot Credentials
-        with st.expander(" Bot Credentials", expanded=False):
+        with st.expander("Telegram credentials", expanded=False):
             bot_token = st.text_input(
-                "Bot Token", 
-                value="", 
+                "Bot token",
+                value="",
                 type="password",
                 help="Get from @BotFather on Telegram",
                 key="telegram_bot_token"
             )
             chat_id = st.text_input(
-                "Chat ID", 
+                "Chat ID",
                 value="",
                 help="Get from @userinfobot on Telegram",
                 key="telegram_chat_id"
             )
-            
+
             # Test Connection Button
-            if st.button(" Test Connection", use_container_width=True):
+            if st.button("Test connection", use_container_width=True):
                 if bot_token and chat_id:
                     test_msg = f"""
- <b>Connection Test Successful!</b>
+<b>Connection test successful</b>
 
- Bot is connected to your Telegram account.
- You will receive alerts here.
+Bot is connected to your Telegram account.
+You will receive alerts here.
 
- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC
+{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC
 """
                     success, msg = send_telegram_message(bot_token, chat_id, test_msg)
                     if success:
-                        st.success(" Test message sent! Check your Telegram.")
+                        st.success("Test message sent. Check your Telegram.")
                     else:
-                        st.error(f" Failed: {msg}")
+                        st.error(f"Failed: {msg}")
                 else:
-                    st.warning(" Please enter both Bot Token and Chat ID")
-        
+                    st.warning("Please enter both Bot Token and Chat ID.")
+
         # Alert Toggles
-        st.markdown("**Alert Types:**")
-        alert_rsi_overbought = st.checkbox(" RSI Overbought (>70)", value=False, key="alert_rsi_ob")
-        alert_rsi_oversold = st.checkbox(" RSI Oversold (<30)", value=False, key="alert_rsi_os")
-        alert_macd = st.checkbox(" MACD Signal", value=False, key="alert_macd")
-        alert_prediction = st.checkbox(" Prediction Results", value=False, key="alert_pred")
+        st.markdown('<div class="qq-eyebrow" style="margin-top:14px;">Triggers</div>',
+                    unsafe_allow_html=True)
+        alert_rsi_overbought = st.checkbox("RSI overbought (>70)", value=False, key="alert_rsi_ob")
+        alert_rsi_oversold   = st.checkbox("RSI oversold (<30)",   value=False, key="alert_rsi_os")
+        alert_macd           = st.checkbox("MACD signal cross",    value=False, key="alert_macd")
+        alert_prediction     = st.checkbox("Prediction result",    value=False, key="alert_pred")
         
         # Store alert settings in session state
         if 'alert_settings' not in st.session_state:
@@ -1586,100 +1505,52 @@ def main():
         # No need to manually assign them here
         
         # Auto-Refresh Toggle
-        refresh = st.checkbox("Auto-Refresh (Live Mode)", value=False)
+        st.markdown('<div class="qq-eyebrow" style="margin-top:14px;">Mode</div>',
+                    unsafe_allow_html=True)
+        refresh = st.checkbox("Auto-refresh (live)", value=False,
+                              help="Re-run the app on every interaction tick.")
         if refresh:
             st.rerun()
-        
-        # Author Credit (Sidebar)
-        st.write("---")
-        st.markdown("""
-        <div style="padding: 15px; background: linear-gradient(135deg, rgba(0, 217, 255, 0.1), rgba(189, 0, 255, 0.1)); 
-                    border-radius: 10px; border: 1px solid rgba(0, 217, 255, 0.3); text-align: center;">
-            <div style="font-size: 0.7rem; color: #888; margin-bottom: 5px;">DEVELOPED BY</div>
-            <div style="font-size: 1rem; font-weight: bold; color: #00D9FF; margin-bottom: 3px;">Ahmad Nur Fauzan</div>
-            <div style="font-size: 0.8rem; color: #BD00FF;">NIM: 2209106057</div>
-            <div style="font-size: 0.7rem; color: #888; margin-top: 8px;">Skripsi - Informatika</div>
-        </div>
-        """, unsafe_allow_html=True)
 
-    # --- Header ---
-    col_h1, col_h2 = st.columns([3, 1])
-    with col_h1:
-        # Static logo in header
-        logo_b64 = get_bitcoin_logo_base64()
+        # Author Credit — quiet, no gradients, mono labels
+        st.write("---")
         st.markdown(f"""
-            <div style="display: flex; align-items: center; gap: 20px;">
-                <img src="data:image/svg+xml;base64,{logo_b64}" style="width: 70px; height: 70px; filter: drop-shadow(0 0 10px rgba(0, 217, 255, 0.5));">
-                <div>
-                    <h1 style="margin: 0; padding: 0; font-size: 3rem; background: linear-gradient(135deg, #FFF 0%, var(--primary-color) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">BTC Intraday Prediction</h1>
-                    <p style="margin: 5px 0 0 0; color: #8899A6; font-size: 1.1rem; letter-spacing: 1px; font-family: 'Rajdhani', sans-serif;">
-                        Advanced LSTM Neural Network • RSI & MACD Strategy
-                    </p>
+            <div style="padding:14px 0 4px 0; line-height:1.6;">
+                <div class="qq-eyebrow" style="margin-bottom:8px;">Author</div>
+                <div style="font-family:var(--qq-font-sans); font-size:13.5px;
+                            font-weight:600; color:var(--qq-text-primary);">
+                    {config.AUTHOR_NAME}
+                </div>
+                <div style="font-family:var(--qq-font-mono); font-size:11.5px;
+                            color:var(--qq-text-muted);">
+                    {config.AUTHOR_NIM} · {config.AUTHOR_PROGRAM}
+                </div>
+                <div style="font-family:var(--qq-font-mono); font-size:11px;
+                            color:var(--qq-text-faint); margin-top:4px;">
+                    Skripsi · {config.COPYRIGHT_YEAR}
                 </div>
             </div>
         """, unsafe_allow_html=True)
-        
-    with col_h2:
-        # Live Clock using Components (Reliable Iframe)
-        clock_html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
-            <style>
-                body {{
-                    background-color: transparent;
-                    margin: 0;
-                    padding: 0;
-                    text-align: right;
-                    font-family: 'JetBrains Mono', monospace;
-                }}
-                .clock-container {{
-                    padding-top: 20px;
-                }}
-                #clock {{
-                    font-size: 24px;
-                    color: #00D9FF;
-                    font-weight: bold;
-                    text-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
-                }}
-                .label {{
-                    font-size: 12px;
-                    color: #888;
-                    margin-top: 4px;
-                    font-family: sans-serif;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="clock-container">
-                <div id="clock">Loading...</div>
-                <div class="label">SERVER TIME (UTC)</div>
-            </div>
-            <script>
-                function updateClock() {{
-                    var now = new Date();
-                    var time = now.toISOString().split('T')[1].split('.')[0];
-                    document.getElementById('clock').innerHTML = time;
-                }}
-                setInterval(updateClock, 1000);
-                updateClock();
-            </script>
-        </body>
-        </html>
-        """
-        components.html(clock_html, height=100)
 
-    # --- Data Loading ---
-    with st.spinner(" Fetching Market Data..."):
+    # ===== DATA LOAD ===== (moved above the header so we have authoritative timestamps)
+    # Split into two spinners so the user can SEE which phase is slow
+    # (network vs. indicator computation). Helps diagnose hangs.
+    _t0 = datetime.now()
+    with st.spinner("Fetching market data from Binance…"):
         df_raw = get_live_bitcoin_data()
+    _t1 = datetime.now()
+    with st.spinner("Computing technical indicators…"):
         df_full, df_model = calculate_technical_indicators(df_raw)
-    
+    _t2 = datetime.now()
+    logger.info(
+        f"Render phase timing — fetch: {(_t1 - _t0).total_seconds():.2f}s, "
+        f"indicators: {(_t2 - _t1).total_seconds():.2f}s"
+    )
+
     # Auto-update actual prices for predictions older than 15 minutes
     if 'performance_tracker' in st.session_state:
         tracker = st.session_state['performance_tracker']
         updated_count = update_actual_prices(tracker, df_raw)
-        
         if updated_count > 0:
             save_tracker_data(tracker)
             logger.info(f"Auto-updated {updated_count} predictions with actual prices")
@@ -1688,56 +1559,126 @@ def main():
     if st.session_state.get('trigger_manual_update', False):
         if 'performance_tracker' in st.session_state:
             tracker = st.session_state['performance_tracker']
-            current_price = df_raw['Close'].iloc[-1]
-            updated = manual_update_all_actual_prices(tracker, current_price)
-            
+            _current_price = df_raw['Close'].iloc[-1]
+            updated = manual_update_all_actual_prices(tracker, _current_price)
             if updated > 0:
                 save_tracker_data(tracker)
                 st.session_state['performance_tracker'] = tracker
-                st.success(f" Updated {updated} predictions with actual prices!")
-                st.info(" Refresh to see updated metrics")
+                st.success(f"Updated {updated} predictions with actual prices.")
+                st.info("Refresh to see updated metrics.")
             else:
-                st.info(" All predictions already have actual prices")
-        
-        # Clear the flag
+                st.info("All predictions already have actual prices.")
         st.session_state['trigger_manual_update'] = False
 
-    # --- Metrics Row ---
+    # ===== HEADER ===== (Quiet Quant: hero strip + page header)
     current_price = df_raw['Close'].iloc[-1]
-    prev_price = df_raw['Close'].iloc[-2]
-    delta = current_price - prev_price
-    
-    m1, m2, m3 = st.columns(3)
+    prev_price    = df_raw['Close'].iloc[-2]
+    delta         = current_price - prev_price
+    delta_pct     = (delta / prev_price) * 100 if prev_price else 0.0
+
+    last_candle_time = df_raw.index[-1]
+    next_candle_time = last_candle_time + timedelta(minutes=15)
+    data_source_used = st.session_state.get('data_source_used', 'unknown')
+
+    # 1. HERO STRIP — small logo + status row
+    logo_b64 = get_bitcoin_logo_base64()
+    source_label = "BINANCE · BTCUSDT" if data_source_used == "binance" else "YFINANCE · BTC-USD"
+    status_html = (
+        styles.live_dot("LIVE")
+        + '<span class="qq-divider"></span>'
+        + f'<span>{source_label}</span>'
+        + '<span class="qq-divider"></span>'
+        + f'<span>{last_candle_time.strftime("%Y-%m-%d · %H:%M UTC")}</span>'
+    )
+    st.markdown(
+        styles.hero_strip(
+            brand_label="BTC · LSTM PREDICTOR · 15M",
+            logo_b64=logo_b64,
+            status_html=status_html,
+        ),
+        unsafe_allow_html=True,
+    )
+
+    # 2. PAGE HEADER — h1 + subtitle + meta (timestamps)
+    meta_html = (
+        f'<div>Last candle&nbsp;&nbsp;{last_candle_time.strftime("%H:%M")} UTC</div>'
+        f'<div>Next forecast&nbsp;&nbsp;{next_candle_time.strftime("%H:%M")} UTC</div>'
+    )
+    st.markdown(
+        styles.page_header(
+            eyebrow_text="Bitcoin · 15-minute intraday",
+            title="Intraday price forecast.",
+            subtitle="A long short-term memory network conditioned on RSI and MACD features, "
+                     "trained to project the next 15-minute closing price.",
+            meta_html=meta_html,
+        ),
+        unsafe_allow_html=True,
+    )
+
+    # ===== METRICS ROW =====
+    # Custom HTML cards so the primary one can carry the accent border-left.
+    rsi_val    = df_full['RSI_14'].iloc[-1]
+    macd_val   = df_full['MACD_12_26_9'].iloc[-1]
+    signal_val = df_full['MACDs_12_26_9'].iloc[-1]
+    hist       = macd_val - signal_val
+
+    if   rsi_val > 70: rsi_label, rsi_variant = "Overbought", "down"
+    elif rsi_val < 30: rsi_label, rsi_variant = "Oversold",   "up"
+    else:              rsi_label, rsi_variant = "Neutral",    "neutral"
+
+    macd_label   = "Bullish" if hist > 0 else "Bearish"
+    macd_variant = "up"      if hist > 0 else "down"
+
+    delta_variant = "up" if delta >= 0 else "down"
+    delta_icon    = ICONS["arrow_up"] if delta >= 0 else ICONS["arrow_down"]
+
+    def _metric_card_html(eyebrow, value, sub_html, primary=False):
+        return f"""
+            <div class="{'qq-card-primary' if primary else 'qq-card'}"
+                 style="height:100%;">
+              <div class="qq-eyebrow">{eyebrow}</div>
+              <div class="qq-metric-hero" style="font-size:34px; margin:10px 0 8px 0;">{value}</div>
+              <div>{sub_html}</div>
+            </div>
+        """
+
+    m1, m2, m3 = st.columns(3, gap="medium")
     with m1:
-        st.metric(
-            "Bitcoin Price", 
-            f"${current_price:,.2f}", 
-            f"{delta:+.2f}",
-            help="Harga Bitcoin saat ini dalam USD. Delta menunjukkan perubahan dari candle sebelumnya (15 menit yang lalu)."
+        sub = (
+            f'<span class="qq-pill qq-pill-{delta_variant}">'
+            f'  <span style="display:inline-flex">{delta_icon}</span>'
+            f'  {delta:+,.2f}  ·  {delta_pct:+.2f}%'
+            f'</span>'
         )
+        st.markdown(_metric_card_html(
+            "BITCOIN  ·  USD",
+            f"${current_price:,.2f}",
+            sub,
+            primary=True,
+        ), unsafe_allow_html=True)
+
     with m2:
-        rsi_val = df_full['RSI_14'].iloc[-1]
-        rsi_status = " Overbought" if rsi_val > 70 else " Oversold" if rsi_val < 30 else " Netral"
-        st.metric(
-            "RSI (14)", 
-            f"{rsi_val:.1f}", 
-            delta=None,
-            help=f"Relative Strength Index (14 periode). Nilai saat ini: {rsi_status}. "
-                 f"RSI > 70 = Overbought (potensi turun), RSI < 30 = Oversold (potensi naik)."
+        sub = (
+            f'<span class="qq-pill qq-pill-{rsi_variant}">'
+            f'  {rsi_label}'
+            f'</span>'
+            f'<span style="margin-left:8px; font-family:var(--qq-font-mono); '
+            f'font-size:11px; color:var(--qq-text-faint);">14-period</span>'
         )
+        st.markdown(_metric_card_html("RSI", f"{rsi_val:.1f}", sub), unsafe_allow_html=True)
+
     with m3:
-        # MACD Histogram as delta
-        macd_val = df_full['MACD_12_26_9'].iloc[-1]
-        signal_val = df_full['MACDs_12_26_9'].iloc[-1]
-        hist = macd_val - signal_val
-        momentum = " Bullish" if hist > 0 else " Bearish"
-        st.metric(
-            "MACD", 
-            f"{macd_val:.2f}", 
-            f"{hist:.2f} (Hist)",
-            help=f"Moving Average Convergence Divergence (12,26,9). Histogram: {momentum}. "
-                 f"Histogram > 0 = Momentum naik, Histogram < 0 = Momentum turun."
+        hist_icon = ICONS["arrow_up"] if hist >= 0 else ICONS["arrow_down"]
+        sub = (
+            f'<span class="qq-pill qq-pill-{macd_variant}">'
+            f'  <span style="display:inline-flex">{hist_icon}</span>'
+            f'  {macd_label}'
+            f'</span>'
+            f'<span style="margin-left:8px; font-family:var(--qq-font-mono); '
+            f'font-size:11px; color:var(--qq-text-faint);">hist {hist:+.2f}</span>'
         )
+        st.markdown(_metric_card_html("MACD  ·  12·26·9", f"{macd_val:.2f}", sub),
+                    unsafe_allow_html=True)
     
     # Check and send Telegram alerts (if enabled)
     if 'alert_settings' in st.session_state and st.session_state.get('alert_settings'):
@@ -1759,350 +1700,428 @@ def main():
                 logger.info(f"Alerts sent: {', '.join(alerts_sent)}")
     
     
-    # Timestamp Info
-    last_candle_time = df_raw.index[-1]
-    next_candle_time = last_candle_time + timedelta(minutes=15)
-    
-    st.caption(f" **Data Terakhir:** {last_candle_time.strftime('%Y-%m-%d %H:%M:%S')} UTC | "
-               f" **Prediksi Untuk:** {next_candle_time.strftime('%H:%M')} UTC")
-    
-    # Data Source Indicator
-    data_source_used = st.session_state.get('data_source_used', 'unknown')
-    if data_source_used == 'binance':
+    # (Timestamps and data source live in the hero strip + page header already.)
+
+    # ===== MARKET ACTIVITY =====
+    st.markdown(
+        styles.section_header("Market activity", "PAST 100 CANDLES · 25h"),
+        unsafe_allow_html=True,
+    )
+    st.plotly_chart(create_main_chart(df_raw, df_full), use_container_width=True,
+                    config={"displayModeBar": False})
+
+    # TradingView Interactive Chart — LAZY MOUNT.
+    # st.expander still executes its body when collapsed, so previously the iframe was
+    # loading on every render. Now we gate the iframe behind an explicit toggle so the
+    # initial page render never waits on tradingview.com's CDN.
+    with st.expander("Open interactive TradingView chart", expanded=False):
+        st.caption(
+            "Loads the full TradingView widget (trendlines, Fibonacci, drawing tools). "
+            "Pulled from tradingview.com — may take a few seconds the first time."
+        )
+        if st.button("Load TradingView widget", key="load_tv_widget"):
+            st.session_state["tv_widget_loaded"] = True
+
+        if st.session_state.get("tv_widget_loaded", False):
+            render_tradingview_widget()
+        else:
+            st.markdown(
+                '<div style="padding:24px; border:1px dashed var(--qq-border-default);'
+                'border-radius:var(--qq-radius-md); color:var(--qq-text-muted);'
+                'font-size:13px; text-align:center;">'
+                'Click <strong style="color:var(--qq-text-primary);">Load TradingView widget</strong> '
+                'above to mount the iframe on demand.'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
         st.markdown("""
-        <div style="display: inline-block; padding: 4px 12px; border-radius: 20px; 
-                    background: linear-gradient(135deg, rgba(0, 255, 136, 0.15), rgba(0, 217, 255, 0.15)); 
-                    border: 1px solid rgba(0, 255, 136, 0.4); margin-bottom: 10px;">
-            <span style="color: #00FF88; font-weight: bold; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">
-                 Data Source: Binance API (Real-time)
-            </span>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.markdown("""
-        <div style="display: inline-block; padding: 4px 12px; border-radius: 20px; 
-                    background: linear-gradient(135deg, rgba(255, 153, 0, 0.15), rgba(255, 200, 0, 0.15)); 
-                    border: 1px solid rgba(255, 153, 0, 0.4); margin-bottom: 10px;">
-            <span style="color: #FF9900; font-weight: bold; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">
-                 Data Source: Yahoo Finance (Delayed ~15min)
-            </span>
-        </div>
+            <a href="https://www.tradingview.com/chart/?symbol=BINANCE:BTCUSDT"
+               target="_blank" rel="noopener"
+               style="display:inline-flex; align-items:center; gap:8px;
+                      padding:8px 14px; border-radius:var(--qq-radius-sm);
+                      background:var(--qq-surface-overlay);
+                      border:1px solid var(--qq-border-default);
+                      color:var(--qq-text-primary);
+                      font-family:var(--qq-font-sans); font-size:12.5px; font-weight:500;
+                      text-decoration:none; margin-top:10px;">
+                Or open in TradingView (full app) →
+            </a>
         """, unsafe_allow_html=True)
 
 
-    # --- Main Chart ---
-    st.plotly_chart(create_main_chart(df_raw, df_full), use_container_width=True)
+    # ===== LSTM FORECAST =====
+    st.markdown(
+        styles.section_header("LSTM forecast",
+                              f"+15 MIN HORIZON · {next_candle_time.strftime('%H:%M UTC')}"),
+        unsafe_allow_html=True,
+    )
 
-    # --- TradingView Interactive Chart ---
-    with st.expander(" **TradingView Interactive Chart** (Gambar Trendline, Zoom, dll)", expanded=False):
-        st.caption(" Chart interaktif dari TradingView. Kamu bisa gambar trendline, fibonacci, dan tools lainnya!")
-        render_tradingview_widget()
-        
-        # Link to full TradingView for drawing tools
-        st.markdown("""
-        <a href="https://www.tradingview.com/chart/?symbol=BINANCE:BTCUSDT" target="_blank" 
-           style="display: inline-block; padding: 8px 16px; border-radius: 8px; 
-                  background: linear-gradient(135deg, #131722, #1e222d); 
-                  border: 1px solid rgba(0, 217, 255, 0.3); color: #00D9FF; 
-                  text-decoration: none; font-family: 'Orbitron', sans-serif; 
-                  font-size: 0.85rem; margin-top: 10px;">
-             Buka TradingView Full (Gambar Trendline, Fibonacci, dll)
-        </a>
-        """, unsafe_allow_html=True)
-        st.caption(" Klik tombol di atas untuk akses drawing tools lengkap di TradingView.com")
+    # Prediction CTA — primary button on the left, terse caption on the right
+    cta_col, cta_hint = st.columns([1, 3], gap="medium")
+    with cta_col:
+        run_prediction = st.button("Run prediction", use_container_width=True, type="primary")
+    with cta_hint:
+        st.markdown(
+            f'<div style="padding-top:9px; font-family:var(--qq-font-mono); font-size:12px; '
+            f'color:var(--qq-text-muted);">'
+            f'Projects the <span style="color:var(--qq-text-primary);">'
+            f'{next_candle_time.strftime("%H:%M UTC")}</span> close from the last 60 candles · '
+            f'inference ≈ 1s'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
+    # Prediction action handler — logic preserved verbatim from original.
+    if run_prediction:
+        is_valid, validation_msg = validate_data_for_prediction(df_raw, min_rows=60)
 
-    # --- Prediction Core ---
-    st.markdown("### LSTM Prediction Core")
-    
-    col_pred_btn, col_pred_res = st.columns([1, 3])
-    
-    with col_pred_btn:
-        if st.button(" RUN PREDICTION MODEL", use_container_width=True, type="primary"):
-            # Validate data first
-            is_valid, validation_msg = validate_data_for_prediction(df_raw, min_rows=60)
-            
-            if not is_valid:
-                st.error(validation_msg)
-                st.warning(" **Saran:** Coba klik tombol 'Force Refresh Data' di sidebar untuk mendapatkan data terbaru.")
-            else:
-                # Data valid, proceed with prediction
-                try:
-                    with st.spinner(" Running LSTM Inference..."):
-                        pred_price, conf, scenarios = predict_next_price(df_model, model, scaler)
-                        
-                        if pred_price:
-                            diff = pred_price - current_price
-                            pct_diff = (diff / current_price) * 100
-                            
-                            st.session_state['last_pred'] = {
-                                'price': pred_price, 'conf': conf, 'scenarios': scenarios,
-                                'diff': diff, 'pct': pct_diff
-                            }
-                            st.success(" Prediksi berhasil!")
-                            
-                            # Track prediction for performance monitoring
-                            tracker = st.session_state.get('performance_tracker', {
-                                'predictions': [],
-                                'correct': 0,
-                                'last_actual_price': None
-                            })
-                            
-                            # Store prediction with metadata
-                            prediction_record = {
-                                'timestamp': datetime.now(),
-                                'predicted_price': pred_price,
-                                'current_price': current_price,
-                                'direction': 'up' if diff > 0 else 'down'
-                            }
-                            
-                            tracker['predictions'].append(prediction_record)
-                            
-                            # Update tracker in session state
-                            st.session_state['performance_tracker'] = tracker
-                            
-                            # Save to persistent storage
-                            save_tracker_data(tracker)
-                            
-                            logger.info(f"Prediction tracked: ${pred_price:,.2f}")
-                            logger.info(f"Tracker state: {len(tracker['predictions'])} predictions")
-                            
-                            # Send Telegram alert for prediction (if enabled)
-                            if st.session_state.get('alert_settings', {}).get('prediction', False):
-                                bot_token = st.session_state.get('telegram_bot_token', '')
-                                chat_id = st.session_state.get('telegram_chat_id', '')
-                                
-                                if bot_token and chat_id:
-                                    direction = "NAIK " if diff > 0 else "TURUN "
-                                    conf_level = "TINGGI" if conf >= 70 else "SEDANG" if conf >= 55 else "RENDAH"
-                                    pred_time = (datetime.now() + timedelta(minutes=15)).strftime('%H:%M')
-                                    
-                                    pred_msg = f"""
- <b>LSTM PREDICTION ALERT</b>
+        if not is_valid:
+            st.error(validation_msg)
+            st.warning("Try **Force refresh data** in the sidebar to pull the latest candles.")
+        else:
+            try:
+                with st.spinner("Running LSTM inference…"):
+                    pred_price, conf, scenarios = predict_next_price(df_model, model, scaler)
 
- Current Price: ${current_price:,.2f}
- Predicted Price: ${pred_price:,.2f}
+                    if pred_price:
+                        diff = pred_price - current_price
+                        pct_diff = (diff / current_price) * 100
 
- Change: {direction} {abs(pct_diff):.2f}%
- Difference: ${abs(diff):,.2f}
+                        st.session_state['last_pred'] = {
+                            'price': pred_price, 'conf': conf, 'scenarios': scenarios,
+                            'diff': diff, 'pct': pct_diff
+                        }
 
- Confidence: {conf_level} ({conf:.1f}%)
+                        # Track for performance monitoring
+                        tracker = st.session_state.get('performance_tracker', {
+                            'predictions': [], 'correct': 0, 'last_actual_price': None
+                        })
+                        tracker['predictions'].append({
+                            'timestamp':       datetime.now(),
+                            'predicted_price': pred_price,
+                            'current_price':   current_price,
+                            'direction':       'up' if diff > 0 else 'down',
+                        })
+                        st.session_state['performance_tracker'] = tracker
+                        save_tracker_data(tracker)
+                        logger.info(f"Prediction tracked: ${pred_price:,.2f}")
+                        logger.info(f"Tracker state: {len(tracker['predictions'])} predictions")
 
- Scenarios:
+                        # Telegram alert for prediction (if enabled)
+                        if st.session_state.get('alert_settings', {}).get('prediction', False):
+                            bot_token = st.session_state.get('telegram_bot_token', '')
+                            chat_id   = st.session_state.get('telegram_chat_id', '')
+                            if bot_token and chat_id:
+                                direction  = "NAIK" if diff > 0 else "TURUN"
+                                conf_level = ("TINGGI" if conf >= 70
+                                              else "SEDANG" if conf >= 55
+                                              else "RENDAH")
+                                pred_time  = (datetime.now() + timedelta(minutes=15)).strftime('%H:%M')
+
+                                pred_msg = f"""
+<b>LSTM PREDICTION ALERT</b>
+
+Current Price: ${current_price:,.2f}
+Predicted Price: ${pred_price:,.2f}
+
+Change: {direction} {abs(pct_diff):.2f}%
+Difference: ${abs(diff):,.2f}
+
+Confidence: {conf_level} ({conf:.1f}%)
+
+Scenarios:
   • Best: ${scenarios['best']:,.2f}
   • Likely: ${scenarios['likely']:,.2f}
   • Worst: ${scenarios['worst']:,.2f}
 
- Prediction Time: {pred_time} UTC
+Prediction Time: {pred_time} UTC
 
- Disclaimer: For reference only, not financial advice.
+Disclaimer: For reference only, not financial advice.
 """
-                                    send_telegram_message(bot_token, chat_id, pred_msg)
-                        else:
-                            st.error(" Model gagal menghasilkan prediksi. Silakan coba lagi.")
-                            
-                except Exception as e:
-                    st.error(f" **Error saat prediksi:** {str(e)}")
-                    st.warning(" **Troubleshooting:**\n"
-                              "1. Pastikan file model (`model_bitcoin_v1_4features.keras`) ada\n"
-                              "2. Pastikan file scaler (`scaler_bitcoin_v1.pkl`) ada\n"
-                              "3. Coba refresh data dengan tombol di sidebar")
-                    import traceback
-                    with st.expander(" Detail Error (untuk debugging)"):
-                        st.code(traceback.format_exc())
+                                send_telegram_message(bot_token, chat_id, pred_msg)
+                    else:
+                        st.error("Model failed to produce a prediction. Please try again.")
 
-    with col_pred_res:
-        if 'last_pred' in st.session_state:
-            res = st.session_state['last_pred']
-            
-            # Prediction Cards
-            pc1, pc2, pc3 = st.columns(3)
-            with pc1:
-                st.markdown(f"""
-                <div style="padding: 20px; background: rgba(0, 217, 255, 0.05); border-radius: 16px; border: 1px solid rgba(0, 217, 255, 0.2); box-shadow: 0 0 20px rgba(0, 217, 255, 0.1);">
-                    <div style="color: #8899A6; font-size: 0.85rem; font-family: 'Orbitron', sans-serif; letter-spacing: 1px;">PREDICTED PRICE (+15m)</div>
-                    <div style="font-size: clamp(1.2rem, 2vw, 2.2rem); font-weight: bold; color: #FFF; font-family: 'JetBrains Mono', monospace; margin: 10px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${res['price']:,.2f}</div>
-                    <div style="display: inline-block; padding: 4px 12px; border-radius: 8px; background: rgba({'0, 255, 136' if res['diff']>0 else '255, 59, 105'}, 0.15); color: {'var(--success-color)' if res['diff']>0 else 'var(--danger-color)'}; font-weight: bold; font-family: 'JetBrains Mono', monospace;">
-                        {res['diff']:+.2f} ({res['pct']:+.2f}%)
+            except Exception as e:
+                st.error(f"Prediction error: {str(e)}")
+                st.warning(
+                    "**Troubleshooting**\n"
+                    "1. Confirm `model_bitcoin_v1_4features.keras` is present.\n"
+                    "2. Confirm `scaler_bitcoin_v1.pkl` is present.\n"
+                    "3. Use **Force refresh data** in the sidebar."
+                )
+                import traceback
+                with st.expander("Stack trace"):
+                    st.code(traceback.format_exc())
+
+    # ----- PREDICTION RESULT PANEL (60/40) -----
+    if 'last_pred' in st.session_state:
+        res = st.session_state['last_pred']
+        is_up = res['diff'] >= 0
+        dir_variant = "up" if is_up else "down"
+        dir_icon    = ICONS["arrow_up"] if is_up else ICONS["arrow_down"]
+
+        if   res['conf'] >= 70: conf_band = ("High",   "high")
+        elif res['conf'] >= 55: conf_band = ("Medium", "mid")
+        else:                   conf_band = ("Low",    "low")
+
+        pred_time_str = (datetime.now() + timedelta(minutes=15)).strftime('%H:%M')
+
+        left_col, right_col = st.columns([3, 2], gap="large")
+
+        # --- LEFT 60% — PRIMARY PREDICTION CARD ---
+        with left_col:
+            primary_html = f"""
+                <div class="qq-card-primary" style="height:100%;">
+                    <div class="qq-eyebrow">PREDICTED CLOSE · {pred_time_str} UTC</div>
+                    <div class="qq-metric-hero">${res['price']:,.2f}</div>
+                    <div class="qq-arrow-row">
+                        <span>From <span class="qq-value-to">${current_price:,.2f}</span></span>
+                        <span class="qq-arrow">{ICONS["arrow_right"]}</span>
+                        <span>To <span class="qq-value-to">${res['price']:,.2f}</span></span>
+                    </div>
+                    <div style="margin-top:18px;">
+                        <span class="qq-pill qq-pill-{dir_variant}">
+                            <span style="display:inline-flex">{dir_icon}</span>
+                            {res['diff']:+,.2f}  ·  {res['pct']:+.2f}%
+                        </span>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
-            
-            with pc2:
-                conf_subtitle = "SEQUENCE STABILITY"
-                st.markdown(f"""
-                <div style="padding: 20px; background: rgba(189, 0, 255, 0.05); border-radius: 16px; border: 1px solid rgba(189, 0, 255, 0.2); box-shadow: 0 0 20px rgba(189, 0, 255, 0.1);">
-                    <div style="color: #8899A6; font-size: 0.85rem; font-family: 'Orbitron', sans-serif; letter-spacing: 1px;">MODEL CONFIDENCE</div>
-                    <div style="font-size: 2.2rem; font-weight: bold; color: #FFF; font-family: 'JetBrains Mono', monospace; margin: 10px 0;">{res['conf']:.1f}%</div>
-                    <div style="color: var(--secondary-color); font-size: 0.75rem; letter-spacing: 0.5px; text-transform: uppercase;">{conf_subtitle}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                 
-            with pc3:
-                st.markdown(f"""
-                <div style="padding: 20px; background: rgba(255, 255, 255, 0.02); border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.08);">
-                    <div style="color: #8899A6; font-size: 0.85rem; font-family: 'Orbitron', sans-serif; letter-spacing: 1px;">SCENARIO ANALYSIS</div>
-                    <div style="font-size: 0.95rem; margin-top: 12px; font-family: 'Rajdhani', sans-serif; font-weight: 500;">
-                        <div style="margin-bottom: 6px;"><span style="color: var(--success-color);"> BULL:</span> <span style="font-family: 'JetBrains Mono';">${res['scenarios']['best']:,.0f}</span></div>
-                        <div style="margin-bottom: 6px;"><span style="color: #8899A6;"> BASE:</span> <span style="font-family: 'JetBrains Mono'; color: #FFF;">${res['scenarios']['likely']:,.0f}</span></div>
-                        <div><span style="color: var(--danger-color);"> BEAR:</span> <span style="font-family: 'JetBrains Mono';">${res['scenarios']['worst']:,.0f}</span></div>
+            """
+            st.markdown(primary_html, unsafe_allow_html=True)
+
+        # --- RIGHT 40% — CONFIDENCE + SCENARIOS ---
+        with right_col:
+            scen = res['scenarios']
+            right_html = f"""
+                <div class="qq-card" style="height:100%;">
+                    <div class="qq-eyebrow">CONFIDENCE</div>
+                    <div style="display:flex; align-items:baseline; gap:10px; margin-top:6px;">
+                        <div class="qq-mono"
+                             style="font-size:28px; font-weight:600;
+                                    color:var(--qq-text-primary);
+                                    letter-spacing:-0.02em;">
+                            {res['conf']:.1f}%
+                        </div>
+                        <span class="qq-pill qq-pill-neutral">{conf_band[0]}</span>
+                    </div>
+                    {styles.meter_bar(res['conf'], conf_band[1])}
+                    <div style="margin-top:18px; padding-top:14px;
+                                border-top:1px solid var(--qq-border-subtle);">
+                        <div class="qq-eyebrow" style="margin-bottom:8px;">Scenarios</div>
+                        <div class="qq-scenario">
+                            <span class="qq-label">Bull</span>
+                            <span class="qq-value">${scen['best']:,.2f}</span>
+                        </div>
+                        <div class="qq-scenario">
+                            <span class="qq-label">Base</span>
+                            <span class="qq-value">${scen['likely']:,.2f}</span>
+                        </div>
+                        <div class="qq-scenario">
+                            <span class="qq-label">Bear</span>
+                            <span class="qq-value">${scen['worst']:,.2f}</span>
+                        </div>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+            """
+            st.markdown(right_html, unsafe_allow_html=True)
 
-            # Confidence Gauge Visualization (NEW!)
-            st.markdown("---")
-            st.markdown("#### Confidence Visualization")
-            
-            gauge_col1, gauge_col2 = st.columns([1, 2])
-            
-            with gauge_col1:
-                # Confidence gauge chart
-                gauge_fig = create_confidence_gauge(res['conf'], "Model Confidence")
-                st.plotly_chart(gauge_fig, use_container_width=True)
-            
-            with gauge_col2:
-                # Confidence breakdown
-                st.markdown("Confidence Breakdown:")
-                st.markdown(f"""
-                - Base Score: 50%
-                - Trend Consistency: Contributes up to +30%
-                - Volatility Penalty: Up to -20%
-                """)
-                
-                st.caption(" Uses basic volatility calculation")
-                
-                # Confidence level indicator
-                if res['conf'] >= 70:
-                    st.success(" HIGH CONFIDENCE - Strong signal")
-                elif res['conf'] >= 55:
-                    st.warning(" MEDIUM CONFIDENCE - Moderate signal")
-                else:
-                    st.error(" LOW CONFIDENCE - Weak signal, use caution")
-            
+        # ----- INTERPRETATION + DISCLAIMER -----
+        direction_text = "rise" if is_up else "fall"
+        st.markdown(f"""
+            <div class="qq-card" style="margin-top:24px;">
+                <div class="qq-eyebrow" style="margin-bottom:10px;">Reading</div>
+                <div style="font-family:var(--qq-font-sans); font-size:14.5px;
+                            color:var(--qq-text-secondary); line-height:1.65;">
+                    Based on the last 60 candles of Close, RSI, MACD and Signal, the model
+                    expects price to <strong style="color:var(--qq-text-primary);">{direction_text} {abs(res['pct']):.2f}%</strong>
+                    over the next 15 minutes, landing near
+                    <strong style="color:var(--qq-text-primary);">${res['price']:,.2f}</strong> at {pred_time_str} UTC.
+                    Internal confidence is <strong style="color:var(--qq-text-primary);">{conf_band[0].lower()}</strong>
+                    ({res['conf']:.1f}%).
+                </div>
+            </div>
 
-            # --- Interpretation & Disclaimer ---
-            st.markdown("---")
-            
-            # Interpretasi dengan confidence
-            confidence_text = "TINGGI" if res['conf'] >= 70 else "SEDANG" if res['conf'] >= 55 else "RENDAH"
-            direction_text = "NAIK" if res['diff'] > 0 else "TURUN"
-            direction_emoji = "" if res['diff'] > 0 else ""
-            
-            # Waktu prediksi (+15 menit dari sekarang)
-            pred_time = (datetime.now() + timedelta(minutes=15)).strftime('%H:%M')
-            
-            # Interpretasi AI (Full Width)
-            st.info(f"""
-            Interpretasi AI:
-            Berdasarkan analisis pola LSTM, model memprediksi bahwa dalam 15 menit ke depan (sekitar pukul {pred_time}),
-            harga Bitcoin berpotensi {direction_text} {direction_emoji} sebesar {abs(res['pct']):.2f}% menuju level ${res['price']:,.2f}.
+            <div style="margin-top:14px; padding:14px 18px;
+                        border:1px solid var(--qq-border-subtle);
+                        border-left:2px solid var(--qq-warning);
+                        border-radius:var(--qq-radius-md);
+                        background:var(--qq-warning-soft);
+                        font-family:var(--qq-font-sans); font-size:12.5px;
+                        color:var(--qq-text-secondary); line-height:1.6;">
+                <strong style="color:var(--qq-text-primary);">Not financial advice.</strong>
+                A 15-minute LSTM has high variance — historical directional accuracy sits in
+                the 55–65% band. The model is blind to news, macro events, and order-book flow.
+                Treat as one signal among many.
+            </div>
+        """, unsafe_allow_html=True)
 
-            Tingkat Keyakinan (Confidence): {confidence_text} ({res['conf']:.1f}%)
-            """)
+        # ----- SEQUENCE INPUT (60-candle pattern) -----
+        st.markdown(
+            styles.section_header("Sequence input",
+                                  "LAST 60 CANDLES · MODEL'S RECEPTIVE FIELD"),
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div style="margin-top:-12px; margin-bottom:18px; color:var(--qq-text-muted); '
+            'font-size:13px; line-height:1.55; max-width:70ch;">'
+            'The 60 most recent 15-minute candles the LSTM sees before producing its '
+            'forecast. The accent-coloured tail (last 10) carries the most weight in the '
+            'sequence representation.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        st.plotly_chart(create_pattern_chart(df_model), use_container_width=True,
+                        config={"displayModeBar": False})
 
-            # Disclaimer (Full Width)
-            st.warning("""
-            Disclaimer Penting:
-            1. Akurasi Model: LSTM untuk timeframe 15 menit memiliki volatilitas tinggi (akurasi estimasi 55-65%).
-            2. Data Input: Prediksi ini murni berdasarkan pola historis 60 candle terakhir (15 jam ke belakang).
-            3. Faktor Eksternal: Market crypto sangat dipengaruhi news/event global yang tidak bisa dilihat oleh model ini.
-            4. Bukan Nasihat Finansial: Gunakan data ini sebagai referensi pendukung keputusan, bukan acuan tunggal.
-            """)
-            
-            # Pattern Visualizer (Full Width, Larger)
-            st.markdown("---")
-            st.subheader(" 60-Candle Pattern (Input Model LSTM)")
-            st.caption("Grafik ini menunjukkan 60 data point terakhir yang 'dilihat' oleh model sebelum membuat prediksi. "
-                      "Model LSTM menganalisis pola Close, RSI, MACD, dan Signal dari 60 candle ini untuk memprediksi harga berikutnya.")
-            
-            # Create larger pattern chart
-            pattern_fig = create_pattern_chart(df_model)
-            st.plotly_chart(pattern_fig, use_container_width=True)
-
-    
-    # Accuracy Trend Chart
-    st.markdown("---")
-    st.markdown("### Accuracy Trend Analysis")
-    st.caption("Model accuracy evolving over time")
-    
+    # ===== ACCURACY TREND =====
     if 'performance_tracker' in st.session_state:
-        tracker = st.session_state['performance_tracker']
-        trend_chart = create_accuracy_trend_chart(tracker)
-        
+        tracker_for_trend = st.session_state['performance_tracker']
+        verified_count = len([p for p in tracker_for_trend.get('predictions', [])
+                              if p.get('actual_price') is not None])
+
+        st.markdown(
+            styles.section_header("Accuracy trend",
+                                  f"{verified_count} VERIFIED · CUMULATIVE"),
+            unsafe_allow_html=True,
+        )
+
+        trend_chart = create_accuracy_trend_chart(tracker_for_trend)
         if trend_chart:
-            st.plotly_chart(trend_chart, use_container_width=True)
-            
-            # Insights
-            verified = len([p for p in tracker.get('predictions', []) if p.get('actual_price') is not None])
-            
-            st.info(f"""
-            Trend Insights:
-            - Chart shows how accuracy evolves as more predictions are verified
-            - {verified} verified predictions
-            - Look for upward trends in directional accuracy and downward trends in MAE/RMSE
-            """)
+            st.plotly_chart(trend_chart, use_container_width=True,
+                            config={"displayModeBar": False})
         else:
-            st.info(" Need at least 2 verified predictions to show trends. Keep making predictions!")
-    
-    # Backtest Results Display
+            # Elegant empty state
+            st.markdown("""
+                <div style="padding:32px 28px; border:1px dashed var(--qq-border-default);
+                            border-radius:var(--qq-radius-md); text-align:center;
+                            color:var(--qq-text-muted);">
+                    <div class="qq-eyebrow" style="margin-bottom:8px;">No data yet</div>
+                    <div style="font-family:var(--qq-font-sans); font-size:13.5px;
+                                color:var(--qq-text-secondary); max-width:46ch; margin:0 auto;
+                                line-height:1.55;">
+                        Run at least two predictions and wait 15 minutes for the actual
+                        candles to land. The chart will start populating then.
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+    # ===== BACKTEST RESULTS =====
     if 'backtest_results' in st.session_state:
         bt_results = st.session_state['backtest_results']
-        
-        st.markdown("---")
-        st.markdown("### Backtesting Results")
-        st.caption("Historical model performance on past data")
-        
         if bt_results.get('v1'):
             v1 = bt_results['v1']
+
+            st.markdown(
+                styles.section_header("Backtest",
+                                      f"{v1['total_predictions']:,} HISTORICAL CANDLES"),
+                unsafe_allow_html=True,
+            )
+
+            # 4-stat panel: directional · MAE · RMSE · sample
+            # Directional uses a progress bar so the headline number breathes.
             st.markdown(f"""
-            <div style="padding: 20px; background: rgba(0, 217, 255, 0.05); border-radius: 16px; border: 1px solid rgba(0, 217, 255, 0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-                <div style="color: #8899A6; font-size: 0.8rem; font-family: 'Orbitron', sans-serif; letter-spacing: 1px;">BACKTEST RESULTS</div>
-                <div style="font-size: 1.8rem; font-weight: bold; color: var(--primary-color); font-family: 'JetBrains Mono', monospace; margin: 8px 0;">Directional: {v1['directional_accuracy']:.1f}%</div>
-                <div style="color: #8899A6; font-size: 0.75rem; font-family: 'Rajdhani', sans-serif;">
-                    MAE: <span style="color: #FFF;">${v1['mae']:.2f}</span><br>
-                    RMSE: <span style="color: #FFF;">${v1['rmse']:.2f}</span><br>
-                    Predictions: {v1['total_predictions']}
+                <div class="qq-card-primary" style="padding:24px 28px;">
+                    <div class="qq-eyebrow">DIRECTIONAL ACCURACY</div>
+                    <div style="display:flex; align-items:baseline; gap:12px; margin:8px 0 4px 0;">
+                        <div class="qq-mono"
+                             style="font-size:42px; font-weight:600;
+                                    color:var(--qq-text-primary);
+                                    letter-spacing:-0.02em;">
+                            {v1['directional_accuracy']:.2f}%
+                        </div>
+                        <span class="qq-pill qq-pill-neutral">{v1['total_predictions']:,} samples</span>
+                    </div>
+                    {styles.meter_bar(v1['directional_accuracy'])}
+                </div>
+
+                <div style="display:grid;
+                            grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+                            gap:16px; margin-top:16px;">
+                    <div class="qq-card">
+                        <div class="qq-eyebrow">MAE</div>
+                        <div class="qq-mono" style="font-size:22px; font-weight:600;
+                                                    color:var(--qq-text-primary); margin-top:8px;
+                                                    letter-spacing:-0.01em;">
+                            ${v1['mae']:,.2f}
+                        </div>
+                    </div>
+                    <div class="qq-card">
+                        <div class="qq-eyebrow">RMSE</div>
+                        <div class="qq-mono" style="font-size:22px; font-weight:600;
+                                                    color:var(--qq-text-primary); margin-top:8px;
+                                                    letter-spacing:-0.01em;">
+                            ${v1['rmse']:,.2f}
+                        </div>
+                    </div>
+                    <div class="qq-card">
+                        <div class="qq-eyebrow">MEDIAN ERROR</div>
+                        <div class="qq-mono" style="font-size:22px; font-weight:600;
+                                                    color:var(--qq-text-primary); margin-top:8px;
+                                                    letter-spacing:-0.01em;">
+                            ${v1['median_error']:,.2f}
+                        </div>
+                    </div>
+                    <div class="qq-card">
+                        <div class="qq-eyebrow">ERROR RANGE</div>
+                        <div class="qq-mono" style="font-size:14px; font-weight:500;
+                                                    color:var(--qq-text-secondary); margin-top:10px;
+                                                    line-height:1.5;">
+                            min ${v1['min_error']:,.2f}<br/>
+                            max ${v1['max_error']:,.2f}
+                        </div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+    # ===== FOOTER =====
+    st.markdown(f"""
+        <div style="margin-top:80px; padding:32px 0 24px 0;
+                    border-top:1px solid var(--qq-border-subtle);">
+            <div style="display:flex; flex-wrap:wrap; gap:32px;
+                        justify-content:space-between; align-items:flex-start;">
+                <div style="max-width:48ch;">
+                    <div class="qq-eyebrow" style="margin-bottom:10px;">Project</div>
+                    <div style="font-family:var(--qq-font-sans); font-size:15px;
+                                font-weight:600; color:var(--qq-text-primary);
+                                line-height:1.4;">
+                        Bitcoin intraday forecasting with LSTM, RSI and MACD
+                    </div>
+                    <div style="font-family:var(--qq-font-sans); font-size:13px;
+                                color:var(--qq-text-muted); margin-top:6px; line-height:1.55;">
+                        {config.APP_SUBTITLE}
+                    </div>
+                </div>
+                <div>
+                    <div class="qq-eyebrow" style="margin-bottom:10px;">Author</div>
+                    <div style="font-family:var(--qq-font-sans); font-size:14px;
+                                font-weight:600; color:var(--qq-text-primary);">
+                        {config.AUTHOR_NAME}
+                    </div>
+                    <div style="font-family:var(--qq-font-mono); font-size:12px;
+                                color:var(--qq-text-muted); margin-top:4px;">
+                        {config.AUTHOR_NIM} · {config.AUTHOR_PROGRAM}
+                    </div>
+                </div>
+                <div>
+                    <div class="qq-eyebrow" style="margin-bottom:10px;">Stack</div>
+                    <div style="font-family:var(--qq-font-mono); font-size:12px;
+                                color:var(--qq-text-secondary); line-height:1.7;">
+                        Streamlit · TensorFlow<br/>
+                        Plotly · Binance API
+                    </div>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
-        
-        # Insights
-        st.info("""
-        Backtest Insights:
-        - Results based on historical data (past performance)
-        - Large sample size provides statistical significance
-        - Use these metrics to validate model performance
-        """)
-
-    # Footer
-    st.markdown("---")
-    st.markdown("""
-    <div style="text-align: center; padding: 20px; background: rgba(255,255,255,0.02); border-radius: 10px; margin-top: 30px;">
-        <div style="font-size: 1.1rem; font-weight: bold; color: #00D9FF; margin-bottom: 10px;">
-             Bitcoin LSTM Prediction Dashboard
-        </div>
-        <div style="font-size: 0.9rem; color: #BBB; margin-bottom: 15px;">
-            Implementasi Algoritma LSTM dengan Indikator RSI dan MACD untuk Prediksi Harga Bitcoin Intraday Berbasis Web
-        </div>
-        <div style="display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin-bottom: 15px;">
-            <div style="font-size: 0.85rem; color: #888;">
-                <span style="color: #BD00FF;"> Developer:</span> Ahmad Nur Fauzan
-            </div>
-            <div style="font-size: 0.85rem; color: #888;">
-                <span style="color: #BD00FF;"> NIM:</span> 2209106057
-            </div>
-            <div style="font-size: 0.85rem; color: #888;">
-                <span style="color: #BD00FF;"> Program Studi:</span> Informatika
+            <div style="margin-top:32px; padding-top:18px;
+                        border-top:1px solid var(--qq-border-subtle);
+                        display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px;
+                        font-family:var(--qq-font-mono); font-size:11px;
+                        color:var(--qq-text-faint); letter-spacing:0.04em;">
+                <span>© {config.COPYRIGHT_YEAR} · {config.AUTHOR_NAME}</span>
+                <span>Skripsi · {config.AUTHOR_PROGRAM}</span>
             </div>
         </div>
-        <div style="font-size: 0.75rem; color: #666; margin-top: 10px;">
-            Tech Stack: LSTM + RSI + MACD | Data Source: Binance API + Yahoo Finance (Fallback) | Framework: Streamlit
-        </div>
-        <div style="font-size: 0.7rem; color: #555; margin-top: 8px;">
-            © 2025 Skripsi Project - All Rights Reserved
-        </div>
-    </div>
     """, unsafe_allow_html=True)
 
 if __name__ == "__main__":

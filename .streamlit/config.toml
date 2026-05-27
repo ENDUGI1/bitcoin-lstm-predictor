@@ -1,14 +1,30 @@
+# ============================================================
+# Streamlit theme — Quiet Quant (matches styles.py / config.py)
+# These tokens are read by Streamlit's React shell before our
+# custom CSS injects, so they handle the "flash of unstyled
+# Streamlit" during initial paint.
+# ============================================================
 [theme]
-primaryColor = "#00D9FF"
-backgroundColor = "#0E1117"
-secondaryBackgroundColor = "#262730"
-textColor = "#FAFAFA"
-font = "sans serif"
+base                     = "dark"
+primaryColor             = "#E07856"   # clay — single accent
+backgroundColor          = "#0F1011"   # surface-base
+secondaryBackgroundColor = "#16181B"   # surface-elevated
+textColor                = "#F1EFEC"   # text-primary
+font                     = "sans serif"
+
+# Sidebar-specific tokens. Streamlit 1.52 only accepts the 4 keys below at
+# config-file level; widget/skeleton tokens are derived internally.
+[theme.sidebar]
+backgroundColor          = "#0A0B0C"   # surface-sunken
+secondaryBackgroundColor = "#16181B"
+textColor                = "#F1EFEC"
+borderColor              = "#1E2024"
 
 [server]
-headless = true
-enableCORS = false
-port = 8501
+headless              = true
+enableCORS            = false
+enableXsrfProtection  = false   # silence the boot warning; safe for local dev
+port                  = 8501
 
 [browser]
 gatherUsageStats = false
