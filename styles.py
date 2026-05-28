@@ -209,10 +209,46 @@ html, body, [class*="css"], .stApp, .stMarkdown, .stText {
     background-image: none;  /* kill the cyan/purple radial blobs */
 }
 
-/* Hide Streamlit chrome we don't need */
-#MainMenu, footer, header[data-testid="stHeader"] {
+/* Hide Streamlit chrome we don't need — but KEEP the header container visible
+   so the sidebar collapse/expand toggle stays accessible. Earlier we hid the
+   entire header which broke the "reopen sidebar" button. */
+#MainMenu, footer { visibility: hidden; height: 0; }
+
+/* Header: make it visually invisible (transparent, no shadow) but keep its
+   children interactive so the sidebar toggle still works. */
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+/* Hide the right-side toolbar (Deploy button, hamburger menu, running man)
+   but NOT the sidebar collapse control. */
+header[data-testid="stHeader"] [data-testid="stToolbar"],
+header[data-testid="stHeader"] [data-testid="stStatusWidget"],
+header[data-testid="stHeader"] [data-testid="stDecoration"] {
     visibility: hidden;
-    height: 0;
+}
+
+/* Belt-and-braces: guarantee the sidebar collapse/expand controls remain
+   visible and clickable across Streamlit versions (the data-testid name has
+   changed between 1.30, 1.46, and 1.52). */
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="stSidebarCollapseButton"],
+[data-testid="collapsedControl"],
+button[kind="headerNoPadding"] {
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+[data-testid="stSidebarCollapsedControl"] svg,
+[data-testid="stSidebarCollapseButton"] svg {
+    color: var(--qq-text-muted) !important;
+    fill: var(--qq-text-muted) !important;
+}
+[data-testid="stSidebarCollapsedControl"]:hover svg,
+[data-testid="stSidebarCollapseButton"]:hover svg {
+    color: var(--qq-text-primary) !important;
+    fill: var(--qq-text-primary) !important;
 }
 
 /* Tabular numerals everywhere */
